@@ -96,6 +96,7 @@ Dark Mode:
   - One-click application of modification suggestions, one-click export of modified documents
   - Adjustable correction parameters to adapt to different task scenarios
   - Recent files list for quickly reopening previously proofread documents
+  - Streaming proofreading output with cancellation at any time; suggestions can be ignored or edited manually
 
 - **Convenient API Configuration Management**:
   - Compatible with OpenAI interfaces, supporting various large language model APIs
@@ -104,6 +105,7 @@ Dark Mode:
 
 - **Clear History Management**:
   - Clearly view historical records including time, proofreading model, proofread file path, and specific results
+  - Search, pagination, result detail view, old/new result comparison, and one-click restore
   - Support for batch management of results
 
 
@@ -163,6 +165,15 @@ First-time use requires configuring a supported large language model API:
 
 ### Changelog
 
+- v1.2.3
+  - Streaming proofreading output: proofreading progress and generated suggestions are displayed in real time, making long-document proofreading visible
+  - Added mid-proofreading cancellation, so you no longer have to wait for the whole document to finish
+  - Refactored the proofreading preview top bar and improved large-document rendering performance
+  - Proofreading suggestions can now be ignored or edited manually; fixed misaligned replacement of duplicated text
+  - Redesigned the history page with search, pagination, detail view, result comparison, and one-click restore
+  - Custom window control buttons replace the native title bar
+  - The API configuration dialog now validates required fields and formats before saving
+  - Internationalized the Format Clone page texts
 - v1.2.2
   - Added table content proofreading; table text now participates in proofreading row by row (previously skipped)
   - Fixed modification write-back loss for paragraphs containing formulas; improved tolerance of footnote/formula marker restoration

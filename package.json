@@ -1,7 +1,7 @@
 {
   "name": "AutoDocxProofreading",
   "productName": "AutoDocxProofreading",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "An intelligent long-document proofreading software powered by large language models. 基于大模型的简单的docx格式文档的校对",
   "main": "./out/main/main.js",
   "scripts": {
