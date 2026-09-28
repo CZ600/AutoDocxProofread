@@ -169,9 +169,9 @@
             <li>{{ t('about.start.npmOrYarn') }}</li>
           </ul>
           <h3>{{ t('about.start.install') }}</h3>
-          <el-code-block lang="bash">npm install</el-code-block>
+          <pre class="code-block"><code>npm install</code></pre>
           <h3>{{ t('about.start.devMode') }}</h3>
-          <el-code-block lang="bash">npm run start</el-code-block>
+          <pre class="code-block"><code>npm run start</code></pre>
         </div>
       </el-tab-pane>
 
@@ -387,6 +387,22 @@ const activeCollapse = ref('1')
   color: #5a6a7a;
 }
 
+.content-tabs .code-block {
+  margin: 6px 0;
+  padding: 10px 14px;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.content-tabs .code-block code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 13px;
+  color: #2c3e50;
+  white-space: pre;
+}
+
 .content-tabs p {
   font-size: 13px;
   color: #5a6a7a;
@@ -416,6 +432,15 @@ html.dark .about-container {
 
 html.dark .tab-card {
   background-color: #000000;
+}
+
+html.dark .content-tabs .code-block {
+  background-color: #1d1e1f;
+  border-color: #2c2e30;
+}
+
+html.dark .content-tabs .code-block code {
+  color: #e0e0e0;
 }
 
 html.dark .content-tabs :deep(.el-tabs__header) {

@@ -35,7 +35,7 @@
               </el-popover>
               <div class="api-option-actions">
                 <el-button :icon="Edit" size="small" circle @click.stop="handleEdit(item)" />
-                <el-button type="danger" :icon="Delete" size="small" circle @click.stop="handleDelete(item.id)" />
+                <el-button type="danger" :icon="Delete" size="small" circle @click.stop="handleDelete(item)" />
               </div>
             </div>
           </el-option>
@@ -55,6 +55,7 @@
 
 <script setup lang="ts">
 import { Delete, Edit, Connection, Plus, Cpu, InfoFilled } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useApiSettings } from '../../composables/useApiSettings'
 import { ModelProvider, MODEL_PROVIDERS } from '../../../shared/modelProviders'
@@ -69,7 +70,7 @@ interface ApiSettingItem {
   provider: ModelProvider
 }
 
-const { selectedApi, apiSettings, deleteApi, testApi, maskApiKey } = useApiSettings()
+const { selectedApi, apiSettings, deleteApi, maskApiKey } = useApiSettings()
 
 const emit = defineEmits<{
   'add-api': []
@@ -94,8 +95,24 @@ const handleEdit = (item: ApiSettingItem) => {
   })
 }
 
-const handleDelete = (id: number) => {
-  deleteApi(id)
+const handleDelete = async (item: ApiSettingItem) => {
+  try {
+    await ElMessageBox.confirm(
+      t('useApiSettings.deleteConfirmMessage', { name: item.modelName }),
+      t('useApiSettings.deleteConfirmTitle'),
+      {
+        confirmButtonText: t('useApiSettings.deleteConfirmOK'),
+        cancelButtonText: t('common.cancel'),
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+        draggable: true
+      }
+    )
+  } catch {
+    // 用户点击取消
+    return
+  }
+  deleteApi(item.id)
 }
 
 const handleTest = () => {

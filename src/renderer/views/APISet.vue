@@ -19,10 +19,27 @@
             @submit="handleSubmitApi"
           />
 
-          <TokenStatistics />
-          <ConcurrencySettings />
-          <RateLimitSettings />
-          <ProxySettings />
+          <div class="setting-group">
+            <div class="setting-group-title">{{ t('apiSettings.groupRuntime') }}</div>
+            <TokenStatistics />
+            <ConcurrencySettings />
+            <RateLimitSettings />
+            <ProxySettings />
+          </div>
+
+          <div class="setting-section">
+            <div class="section-header">
+              <el-icon><Connection /></el-icon>
+              <span>{{ t('apiSettings.languageLabel') }}</span>
+            </div>
+            <div class="lang-row">
+              <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
+              <el-select v-model="currentLocale" @change="handleLocaleChange" size="default" class="lang-select">
+                <el-option label="简体中文" value="zh-CN" />
+                <el-option label="English" value="en" />
+              </el-select>
+            </div>
+          </div>
         </div>
       </el-tab-pane>
 
@@ -82,17 +99,6 @@
         </div>
       </el-tab-pane>
     </el-tabs>
-
-    <div class="setting-section setting-section--lang">
-      <div class="section-header">
-        <el-icon><Connection /></el-icon>
-        <span>{{ t('apiSettings.languageLabel') }}</span>
-      </div>
-      <el-select v-model="currentLocale" @change="handleLocaleChange" size="small">
-        <el-option label="简体中文" value="zh-CN" />
-        <el-option label="English" value="en" />
-      </el-select>
-    </div>
   </div>
 </template>
 
@@ -275,6 +281,44 @@ onMounted(async () => {
 .tab-content {
   padding: 20px 0;
   background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 分组容器：让一组相关卡片在视觉上聚合，并统一内边距节奏 */
+.setting-group {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setting-group > :deep(.setting-section) {
+  margin-bottom: 0;
+}
+
+/* 分组小标题：提供层次感 */
+.setting-group-title {
+  margin-top: 12px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #8a9aa8;
+  text-transform: uppercase;
+}
+
+/* 统一所有子卡片的边距节奏 */
+.tab-content :deep(.setting-section) {
+  margin-bottom: 12px;
+  padding: 16px 18px;
+}
+
+.tab-content > :deep(.setting-section:last-child),
+.setting-group > :deep(.setting-section:last-child) {
+  margin-bottom: 0;
 }
 
 .fade-slide {
@@ -389,6 +433,24 @@ onMounted(async () => {
 
 .setting-section--lang {
   padding: 14px 18px;
+}
+
+.lang-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lang-desc {
+  font-size: 13px;
+  color: #7a8694;
+  line-height: 1.6;
+}
+
+.lang-select {
+  width: 180px;
+  flex-shrink: 0;
 }
 </style>
 

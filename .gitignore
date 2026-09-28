@@ -104,6 +104,12 @@ dist/
 
 # Generated test fixtures (built at runtime by vitest)
 __tests__/reduceAiTocSkip_tmp/
-__tests__/__tests__/tmp/
+__tests__/tmp/
+# tsc 编译产物（proofTable.test.cjs 运行前生成；wordProcess.js 因被
+# wordProcess.test.js 作为夹具依赖而保持跟踪，其余子目录不入库）
+__tests__/tmp_compile/main/
+__tests__/tmp_compile/shared/
+# Windows 保留设备名伪文件（Git Bash 误用 > nul 重定向产生）
+nul
 *.docx
 

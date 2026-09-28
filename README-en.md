@@ -82,17 +82,20 @@ Dark Mode:
   - Typo detection
   - Punctuation error recognition
   - Grammar issue detection
+  - Table content proofreading: table text is organized row by row for proofreading, with results highlighted and replaceable in tables
 
 - **Knowledge Base System**:
   - Create and manage multiple local knowledge bases
   - Support importing PDF, Word, and txt documents as reference materials
   - RAG (Retrieval-Augmented Generation) algorithm based on vector database
+  - Select multiple knowledge bases simultaneously as reference during proofreading
 
 - **Faster Processing Speed and User-Friendly Experience**:
   - Optimized processing efficiency using parallel processing, significantly improving proofreading speed for long texts
   - Clear error display and modification suggestions
   - One-click application of modification suggestions, one-click export of modified documents
   - Adjustable correction parameters to adapt to different task scenarios
+  - Recent files list for quickly reopening previously proofread documents
 
 - **Convenient API Configuration Management**:
   - Compatible with OpenAI interfaces, supporting various large language model APIs
@@ -126,8 +129,8 @@ First-time use requires configuring a supported large language model API:
 ### 3. Document Proofreading
 
 1. Select the "Document Proofreading" tab
-2. Click "Select DOCX File" button to choose the Word document to proofread
-3. (Optional) Select a knowledge base to enhance proofreading accuracy
+2. Click "Select DOCX File" button to choose the Word document to proofread (the dropdown arrow next to the button quickly reopens recently proofread files)
+3. (Optional) Check one or more knowledge bases to enhance proofreading accuracy
 4. Choose an appropriate proofreading mode:
    - **Sentence-by-sentence Proofreading**: Suitable for short texts requiring high-precision proofreading
    - **Paragraph-by-paragraph Correction**: Suitable for proofreading long documents
@@ -160,6 +163,21 @@ First-time use requires configuring a supported large language model API:
 
 ### Changelog
 
+- v1.2.1
+  - Added table content proofreading; table text now participates in proofreading row by row (previously skipped)
+  - Fixed modification write-back loss for paragraphs containing formulas; improved tolerance of footnote/formula marker restoration
+  - Added a recent files list for quickly reopening previously proofread documents
+  - Support selecting multiple knowledge bases simultaneously during proofreading
+  - Rearranged the API settings page, moved language switching into settings, and added delete confirmation for API entries
+- v1.2.0
+  - Improved the reduce AI detection effect
+  - Improved document structure recognition and paragraph matching accuracy
+  - Replaced the vector engine with sqlite-vec, greatly reducing the installer size
+  - Improved RAG retrieval quality
+- v1.1.9
+  - Updated AI format parsing
+  - Fixed Claude API availability
+  - Fixed Gemini API availability
 - v1.1.8
   - Updated the reduce AI detection feature
   - Updated the format migration feature
@@ -199,9 +217,9 @@ First-time use requires configuring a supported large language model API:
 
 - **Main Framework**: [Electron](https://www.electronjs.org/) + [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/)
 - **UI Component Library**: [Element Plus](https://element-plus.org/)
-- **Build Tools**: [Vite](https://vitejs.dev/) + [Electron Forge](https://www.electronforge.io/)
+- **Build Tools**: [electron-vite](https://electron-vite.org/) + [electron-builder](https://www.electron.build/)
 - **Document Processing**: [Mammoth](https://github.com/mwilliamson/mammoth.js) + [Docxtemplater](https://github.com/open-xml-templating/docxtemplater)
-- **Vector Database**: [LanceDB](https://lancedb.com/)
+- **Vector Search**: [sqlite-vec](https://github.com/asg017/sqlite-vec) extension (local vector storage on top of sqlite3)
 - **Code Standards**: [ESLint](https://eslint.org/) + [Prettier](https://prettier.io/)
 - **Version Management**: [Standard Version](https://github.com/conventional-changelog/standard-version)
 

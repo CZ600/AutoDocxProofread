@@ -87,9 +87,61 @@
         </transition>
 
         <div class="button-group">
-          <el-button type="primary" :loading="isLoading" @click="selectFileWithMainProcessRead" size="default">
-            {{ isLoading ? t('proof.loading') : t('proof.selectFile') }}
-          </el-button>
+          <el-button-group class="select-file-split">
+            <el-button type="primary" :loading="isLoading" @click="selectFileWithMainProcessRead" size="default">
+              {{ isLoading ? t('proof.loading') : t('proof.selectFile') }}
+            </el-button>
+            <el-dropdown
+              placement="bottom-end"
+              trigger="click"
+              popper-class="recent-files-dropdown-popper"
+            >
+              <el-button
+                type="primary"
+                size="default"
+                class="select-file-split-trigger"
+                :title="t('recentFiles.title')"
+              >
+                <el-icon><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <div class="recent-files-dropdown">
+                  <div class="recent-files-header">
+                    <span class="recent-files-title">
+                      <el-icon class="recent-files-title-icon"><Clock /></el-icon>
+                      {{ t('recentFiles.title') }}
+                      <span v-if="recentFilesStore.count > 0" class="recent-files-count">{{ recentFilesStore.count }}</span>
+                    </span>
+                    <el-button
+                      v-if="!recentFilesStore.isEmpty"
+                      link
+                      size="small"
+                      class="recent-files-clear"
+                      @click="clearRecentFiles"
+                    >
+                      {{ t('recentFiles.clear') }}
+                    </el-button>
+                  </div>
+                  <div class="recent-files-list">
+                    <div
+                      v-for="item in recentFilesStore.getList"
+                      :key="item.path"
+                      class="recent-files-item"
+                      @click="openRecentFile(item)"
+                    >
+                      <el-icon class="recent-files-item-icon"><Document /></el-icon>
+                      <div class="recent-files-item-main">
+                        <div class="recent-files-item-name" :title="item.name">{{ item.name }}</div>
+                        <div class="recent-files-item-meta" :title="item.dir">{{ formatRecentTime(item.lastOpenedAt) }}</div>
+                      </div>
+                      <el-icon class="recent-files-item-close" @click.stop="removeRecentFile(item, $event)"><Close /></el-icon>
+                    </div>
+                    <div v-if="recentFilesStore.isEmpty" class="recent-files-empty">{{ t('recentFiles.empty') }}</div>
+                  </div>
+                </div>
+              </template>
+            </el-dropdown>
+          </el-button-group>
 
           <el-button
             :type="activeMode === 'format-clone' ? 'warning' : 'default'"
@@ -108,23 +160,44 @@
             <el-option :label="t('proof.modeReduceAI')" value="reduceAI" />
           </el-select>
 
-          <el-dropdown placement="bottom">
-            <el-button size="default" :class="['kb-button', selectRepository.length > 0 ? 'kb-button-active' : '']">
+          <el-dropdown placement="bottom" popper-class="kb-dropdown-popper">
+            <el-button
+              size="default"
+              :class="['kb-button', selectRepository.length > 0 ? 'kb-button-active' : '']"
+            >
               <el-icon><Collection /></el-icon>
+              <span v-if="selectRepository.length > 0" class="kb-count-badge">{{ selectRepository.length }}</span>
             </el-button>
             <template #dropdown>
-              <el-text style="display: flex; justify-content: center; padding: 8px 0 4px">{{
-                t('proof.selectKnowledge')
-              }}</el-text>
-              <el-dropdown-menu>
-                <el-dropdown-item
-                  v-for="value in repositoryList"
-                  :key="value"
-                  :index="value"
-                  @click="addRepository(value)"
-                  >{{ value }}</el-dropdown-item
-                >
-              </el-dropdown-menu>
+              <div class="kb-dropdown">
+                <div class="kb-dropdown-header">
+                  <span class="kb-dropdown-title">
+                    <el-icon class="kb-dropdown-title-icon"><Collection /></el-icon>
+                    {{ t('proof.selectKnowledge') }}
+                  </span>
+                  <span v-if="selectRepository.length > 0" class="kb-dropdown-selected-count">
+                    {{ t('proof.kbSelectedCount', { count: selectRepository.length }) }}
+                  </span>
+                </div>
+                <div class="kb-dropdown-list">
+                  <div
+                    v-for="value in repositoryList"
+                    :key="value"
+                    class="kb-dropdown-option"
+                    :class="{ 'is-selected': selectRepository.includes(value) }"
+                    @click="addRepository(value)"
+                  >
+                    <el-icon class="kb-option-check">
+                      <Select v-if="selectRepository.includes(value)" />
+                      <Folder v-else />
+                    </el-icon>
+                    <span class="kb-option-name">{{ value }}</span>
+                  </div>
+                  <div v-if="repositoryList.length === 0" class="kb-dropdown-empty">
+                    {{ t('proof.kbEmpty') }}
+                  </div>
+                </div>
+              </div>
             </template>
           </el-dropdown>
 
@@ -157,7 +230,30 @@
 
     <div class="preview-area">
       <div ref="previewContainer" class="preview-container">
-        <el-empty v-if="!fileName" :description="t('proof.previewFile')" :image-size="80" />
+        <div v-if="!fileName" class="preview-empty-wrap">
+          <el-empty :description="t('proof.previewFile')" :image-size="80" />
+          <div v-if="!recentFilesStore.isEmpty" class="recent-cards">
+            <div class="recent-cards-title">
+              <el-icon><Files /></el-icon>
+              <span>{{ t('recentFiles.cardTitle') }}</span>
+            </div>
+            <div class="recent-cards-grid">
+              <div
+                v-for="item in recentCardList"
+                :key="item.path"
+                class="recent-card"
+                @click="openRecentFile(item)"
+              >
+                <el-icon class="recent-card-icon"><Document /></el-icon>
+                <div class="recent-card-body">
+                  <div class="recent-card-name" :title="item.name">{{ item.name }}</div>
+                  <div class="recent-card-meta" :title="item.dir">{{ formatRecentTime(item.lastOpenedAt) }}</div>
+                </div>
+                <el-icon class="recent-card-close" @click.stop="removeRecentFile(item, $event)"><Close /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -174,6 +270,7 @@ import {
   ElSelect,
   ElOption,
   ElMessage,
+  ElMessageBox,
   ElProgress,
   ElTooltip,
   ElDropdown,
@@ -187,7 +284,8 @@ import { fileInfoStore } from '../stores/store'
 import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useRepositoryStore } from '../stores/repositoryStore'
 import { useApiStore } from '../stores/apiStore'
-import { Collection, Document, ArrowDown, Select, RefreshLeft } from '@element-plus/icons-vue'
+import { useRecentFilesStore, formatRelativeTime } from '../stores/recentFilesStore'
+import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files } from '@element-plus/icons-vue'
 import { useDark } from '@vueuse/core'
 import { requiresBaseURL } from '../../shared/modelProviders'
 
@@ -222,6 +320,7 @@ let skipWatcherRerender = false
 const fileStore = fileInfoStore()
 const apiSettingsStore = useApiStore()
 const embeddingStore = useEmbeddingStore()
+const recentFilesStore = useRecentFilesStore()
 
 const fileName = computed(() => fileStore.fileName)
 const proofreadingResults = computed({
@@ -261,7 +360,7 @@ const normalizeCorrectionType = type => {
 }
 
 const FOOTNOTE_PLACEHOLDER_RE = /\[\[FOOTNOTE_REF:\d+\]\]/g
-const MATH_PLACEHOLDER_RE = /\[\[MATH:.*?\]\]/g
+const MATH_PLACEHOLDER_RE = /\[\[MATH:[\s\S]*?\]\]/g
 
 const stripFootnotePlaceholders = text => {
   return stripZeroWidth(text.replace(FOOTNOTE_PLACEHOLDER_RE, '').replace(MATH_PLACEHOLDER_RE, ''))
@@ -297,7 +396,8 @@ const createFootnoteAwareMatcher = (searchText, flags = 'g') => {
   // 这些字符在 docx-preview 渲染的 DOM 中通常不存在，会直接导致匹配失败。
   const cleanedSearch = stripZeroWidth(searchText)
   // 先用统一分隔符拆分，同时处理 [[FOOTNOTE_REF:x]] 和 [[MATH:...]]
-  const parts = cleanedSearch.split(/\[\[FOOTNOTE_REF:\d+\]\]|\[\[MATH:.*?\]\]/)
+  // （[\s\S] 使公式文本含换行时也能拆开）
+  const parts = cleanedSearch.split(/\[\[FOOTNOTE_REF:\d+\]\]|\[\[MATH:[\s\S]*?\]\]/)
   const escapedParts = parts.map(part =>
     part
       .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -306,14 +406,18 @@ const createFootnoteAwareMatcher = (searchText, flags = 'g') => {
   )
 
   // 统计占位符出现顺序，确定每个间隙用什么通配符
-  const placeholderPattern = /\[\[FOOTNOTE_REF:\d+\]\]|\[\[MATH:.*?\]\]/g
+  // （在剥离零宽后的文本上扫描，与上面的 split 保持同一来源）
+  const placeholderPattern = /\[\[FOOTNOTE_REF:\d+\]\]|\[\[MATH:[\s\S]*?\]\]/g
   const wildcards = []
   let m
-  while ((m = placeholderPattern.exec(searchText)) !== null) {
+  while ((m = placeholderPattern.exec(cleanedSearch)) !== null) {
     if (m[0].startsWith('[[FOOTNOTE_REF:')) {
+      // 脚注引用在 DOM 中渲染为上标数字
       wildcards.push('\\d*')
     } else {
-      wildcards.push('[^\\s]*?')
+      // 公式渲染为 MathML，其文本内容是 m:t 的拼接——结构分数、上下标等
+      // 元素间常出现空格，必须允许跨空格匹配，否则高亮静默失败
+      wildcards.push('[\\s\\S]*?')
     }
   }
 
@@ -877,6 +981,39 @@ const selectFileWithMainProcessRead = async () => {
       return
     }
     const name = filePath.split('\\').pop().split('/').pop()
+    await loadFile(filePath, name, { recordRecent: true, errorKey: 'proof.errors.fileFailed' })
+  } catch (err) {
+    error.value = t('proof.errors.fileFailed', { message: err.message })
+    console.error('文件处理错误:', err)
+    isLoading.value = false
+  }
+}
+
+/**
+ * 统一的文件加载入口：读取 docx -> 渲染 -> 重置校对结果 ->（可选）记录到最近文件。
+ *
+ * 抽取自 selectFileWithMainProcessRead，便于"最近文件"快速打开、onMounted 恢复预览
+ * 等多个入口复用，避免重复读取/渲染逻辑分散。
+ *
+ * @param options.recordRecent 是否写入最近文件列表（从最近文件列表点击打开时也传 true，
+ *   会刷新 lastOpenedAt；onMounted 恢复预览传 false，避免冷启动被误判为一次"打开"）
+ * @param options.errorKey 加载失败时使用的 i18n 错误 key
+ * @param options.fromRecent 是否来自最近文件列表入口（用于失败时回退清理该列表项）
+ * @returns 是否加载成功
+ */
+const loadFile = async (
+  filePath,
+  name,
+  options = {}
+) => {
+  const {
+    recordRecent = true,
+    errorKey = 'proof.errors.fileFailed',
+    fromRecent = false
+  } = options
+  try {
+    isLoading.value = true
+    error.value = ''
     fileStore.setFilePath(filePath)
     fileStore.setFileName(name)
     form.value.filePath = filePath
@@ -901,11 +1038,61 @@ const selectFileWithMainProcessRead = async () => {
     cachedDocxFile = file
     await renderDocx(file)
     fileStore.setCorrectResult([])
+    if (recordRecent) {
+      recentFilesStore.addRecent(filePath, name)
+    }
     isLoading.value = false
+    return true
   } catch (err) {
-    error.value = t('proof.errors.fileFailed', { message: err.message })
-    console.error('文件处理错误:', err)
     isLoading.value = false
+    // 来自最近文件列表的打开失败：文件可能已被移动/删除，清理失效项并给出更友好的提示
+    if (fromRecent) {
+      recentFilesStore.removeRecent(filePath)
+      ElMessage.warning(t('recentFiles.openFailed', { name }))
+      // 同时清掉 store 中的失效路径，避免右侧还残留一个打不开的文件名
+      if (fileStore.filePath === filePath) {
+        fileStore.clearAll()
+        form.value.filePath = ''
+      }
+    } else {
+      error.value = t(errorKey, { message: err.message })
+    }
+    console.error('文件加载失败:', err)
+    return false
+  }
+}
+
+/** 相对时间格式化（包装为组件内方法，供模板使用） */
+const formatRecentTime = ts => formatRelativeTime(ts, t)
+
+/** 预览区空状态展示的卡片列表（最多 6 条，避免空状态过长） */
+const recentCardList = computed(() => recentFilesStore.getList.slice(0, 6))
+
+/** 从最近文件列表点击打开 */
+const openRecentFile = item => loadFile(item.path, item.name, { recordRecent: true, fromRecent: true })
+
+/** 从最近文件列表移除单条 */
+const removeRecentFile = (item, event) => {
+  if (event) {
+    event.stopPropagation()
+  }
+  recentFilesStore.removeRecent(item.path)
+  ElMessage.success(t('recentFiles.removed'))
+}
+
+/** 清空最近文件列表 */
+const clearRecentFiles = async () => {
+  if (recentFilesStore.isEmpty) return
+  try {
+    await ElMessageBox.confirm(t('recentFiles.clearConfirm'), t('recentFiles.clearWarning'), {
+      confirmButtonText: t('common.confirm'),
+      cancelButtonText: t('common.cancel'),
+      type: 'warning'
+    })
+    recentFilesStore.clearRecent()
+    ElMessage.success(t('recentFiles.cleared'))
+  } catch {
+    // 用户取消
   }
 }
 
@@ -1160,32 +1347,16 @@ onMounted(async () => {
   initCorrectStatus()
 
   if (fileStore.filePath && fileStore.fileName) {
-    try {
-      isLoading.value = true
-      const fileData = await electronAPI.readDocxFile(fileStore.filePath)
-      const byteCharacters = atob(fileData.content)
-      const byteArrays = []
-      for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-        const slice = byteCharacters.slice(offset, offset + 512)
-        const byteNumbers = Array.from({ length: slice.length }, (_, i) => slice.charCodeAt(i))
-        byteArrays.push(new Uint8Array(byteNumbers))
-      }
-      const blob = new Blob(byteArrays, {
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      })
-      const file = new File([blob], fileStore.fileName, {
-        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-      })
-      cachedDocxFile = file
-      await renderDocx(file)
-      if (proofreadingResults.value.length > 0) {
-        nextTick(() => highlightCorrections())
-      }
-    } catch (err) {
-      console.error('恢复预览失败:', err)
+    const ok = await loadFile(fileStore.filePath, fileStore.fileName, {
+      // 冷启动恢复：成功则把该文件刷入最近列表（视为一次正常打开），失败则清空 store
+      recordRecent: true,
+      errorKey: 'proof.errors.fileFailed',
+      fromRecent: false
+    })
+    if (ok && proofreadingResults.value.length > 0) {
+      nextTick(() => highlightCorrections())
+    } else if (!ok) {
       fileStore.clearAll()
-    } finally {
-      isLoading.value = false
     }
   }
 })
@@ -1272,6 +1443,180 @@ html.dark .preview-container a {
   color: #75c777 !important;
 }
 
+/* ---- 最近文件下拉（popper 渲染在 body，需放全局样式） ---- */
+.recent-files-dropdown {
+  width: 320px;
+  padding: 8px 0 0 0;
+}
+
+.recent-files-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 14px 8px 14px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.recent-files-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a6580;
+}
+
+.recent-files-title-icon {
+  color: #7b9eb8;
+}
+
+.recent-files-count {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9aa4b1;
+  background-color: #f4f6f9;
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 2px;
+}
+
+.recent-files-clear {
+  font-size: 12px;
+  color: #c28a8a;
+}
+
+.recent-files-clear:hover {
+  color: #b07575;
+}
+
+.recent-files-list {
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.recent-files-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+.recent-files-item:hover {
+  background-color: #f6faff;
+}
+
+.recent-files-item-icon {
+  color: #7b9eb8;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.recent-files-item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-files-item-name {
+  font-size: 13px;
+  color: #4a6580;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-files-item-meta {
+  margin-top: 1px;
+  font-size: 11px;
+  color: #9aa4b1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-files-item-close {
+  color: #c0c4cc;
+  font-size: 12px;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.recent-files-item:hover .recent-files-item-close {
+  opacity: 1;
+}
+
+.recent-files-item-close:hover {
+  color: #c28a8a;
+  background-color: rgba(194, 138, 138, 0.1);
+}
+
+.recent-files-empty {
+  padding: 24px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #9aa4b1;
+}
+
+/* 最近文件下拉：暗色模式 */
+html.dark .recent-files-dropdown {
+  background-color: transparent;
+}
+
+html.dark .recent-files-header {
+  border-bottom-color: #2c2e30;
+}
+
+html.dark .recent-files-title {
+  color: #c0c4cc;
+}
+
+html.dark .recent-files-count {
+  background-color: #252627;
+  color: #8a929e;
+}
+
+html.dark .recent-files-item:hover {
+  background-color: #252525;
+}
+
+html.dark .recent-files-item-name {
+  color: #c0c4cc;
+}
+
+html.dark .recent-files-item-icon {
+  color: #7b9eb8;
+}
+
+/* 最近文件卡片：暗色模式 */
+html.dark .recent-cards-title {
+  color: #c0c4cc;
+}
+
+html.dark .recent-card {
+  background-color: #1d1e1f;
+  border-color: #2c2e30;
+}
+
+html.dark .recent-card:hover {
+  border-color: #3a5a78;
+  background-color: #1a2433;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+html.dark .recent-card-name {
+  color: #c0c4cc;
+}
+
+html.dark .recent-card-icon {
+  color: #7b9eb8;
+}
+
 html.dark .preview-container blockquote {
   border-left-color: #4c4d4f !important;
   background-color: #141414 !important;
@@ -1297,6 +1642,49 @@ html.dark .inline-progress-stage {
 
 html.dark .inline-progress-percent {
   color: #d7e9ff;
+}
+
+html.dark .kb-dropdown {
+  background-color: #1d1e1f;
+}
+
+html.dark .kb-dropdown-header {
+  background: linear-gradient(180deg, #232526 0%, #1a1b1c 100%);
+  border-bottom-color: #2c2e30;
+}
+
+html.dark .kb-dropdown-title {
+  color: #e0e6ed;
+}
+
+html.dark .kb-dropdown-title-icon {
+  color: #8ec5ff;
+}
+
+html.dark .kb-dropdown-option {
+  color: #c0c4cc;
+}
+
+html.dark .kb-dropdown-option:hover {
+  background-color: #252627;
+  color: #e0e0e0;
+}
+
+html.dark .kb-dropdown-option.is-selected {
+  background-color: rgba(103, 194, 58, 0.18);
+  color: #95d475;
+}
+
+html.dark .kb-option-check {
+  color: #5c636b;
+}
+
+html.dark .kb-dropdown-empty {
+  color: #6a6a6a;
+}
+
+html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
+  background: #3a3c3e;
 }
 
 .inline-progress-container {
@@ -1353,6 +1741,119 @@ html.dark .inline-progress-percent {
 .inline-progress-fade-leave-to {
   opacity: 0;
   transform: scaleX(0.8);
+}
+
+/* 知识库下拉面板 */
+.kb-dropdown {
+  width: 240px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+.kb-dropdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px 10px;
+  background: linear-gradient(180deg, #f4f8fb 0%, #eef3f7 100%);
+  border-bottom: 1px solid #e1e8ee;
+}
+
+.kb-dropdown-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2f4a63;
+  letter-spacing: 0.3px;
+}
+
+.kb-dropdown-title-icon {
+  color: #5b7c99;
+  font-size: 15px;
+}
+
+.kb-dropdown-selected-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  background-color: #67c23a;
+  padding: 2px 8px;
+  border-radius: 10px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.kb-dropdown-list {
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.kb-dropdown-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #4a5a6a;
+  transition: background 0.18s ease, color 0.18s ease;
+  user-select: none;
+}
+
+.kb-dropdown-option:hover {
+  background-color: #f1f6fa;
+  color: #2f4a63;
+}
+
+.kb-dropdown-option.is-selected {
+  background-color: rgba(103, 194, 58, 0.1);
+  color: #4e8c3a;
+  font-weight: 600;
+}
+
+.kb-option-check {
+  font-size: 15px;
+  color: #a8b8c6;
+  flex-shrink: 0;
+}
+
+.kb-dropdown-option.is-selected .kb-option-check {
+  color: #67c23a;
+}
+
+.kb-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kb-dropdown-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #a8b3bd;
+}
+
+.kb-dropdown-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.kb-dropdown-list::-webkit-scrollbar-thumb {
+  background: #cfd9e1;
+  border-radius: 3px;
+}
+
+.kb-dropdown-list::-webkit-scrollbar-thumb:hover {
+  background: #b6c4d0;
 }
 </style>
 
@@ -1427,12 +1928,31 @@ html.dark .inline-progress-percent {
 }
 
 .kb-button {
-  padding: 8px;
+  position: relative;
+  padding: 8px 10px;
+  transition: all 0.2s ease;
 }
 
 .kb-button-active {
   color: #67c23a;
   border-color: #67c23a;
+  background-color: rgba(103, 194, 58, 0.08);
+}
+
+.kb-count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background-color: #67c23a;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
 }
 
 .preview-area {
@@ -1452,6 +1972,133 @@ html.dark .inline-progress-percent {
 
 .preview-container:hover {
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* ---- 「选择文件」分体按钮：主按钮 + 箭头触发器 ---- */
+.select-file-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.select-file-split :deep(.el-button) {
+  margin-left: 0 !important;
+}
+
+.select-file-split-trigger {
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.select-file-split-trigger .el-icon {
+  font-size: 14px;
+}
+
+/* ---- 预览区空状态：最近文件卡片 ---- */
+.preview-empty-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 48px 32px;
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.recent-cards {
+  width: 100%;
+  max-width: 720px;
+  margin-top: 12px;
+}
+
+.recent-cards-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a6580;
+  margin-bottom: 12px;
+  padding-left: 4px;
+}
+
+.recent-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.recent-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #edf0f4;
+  border-radius: 8px;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recent-card:hover {
+  border-color: #b7dcff;
+  background-color: #f6faff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(123, 158, 184, 0.12);
+}
+
+.recent-card-icon {
+  color: #7b9eb8;
+  font-size: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.recent-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a6580;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-card-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #9aa4b1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-card-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: #c0c4cc;
+  font-size: 12px;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.recent-card:hover .recent-card-close {
+  opacity: 1;
+}
+
+.recent-card-close:hover {
+  color: #c28a8a;
+  background-color: rgba(194, 138, 138, 0.1);
 }
 
 @media (max-width: 992px) {

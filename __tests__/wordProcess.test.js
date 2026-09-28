@@ -616,6 +616,126 @@ async function testMathPlaceholderWithZeroWidth() {
   console.log('  ✅ 测试12通过: 公式占位符 + 零宽字符场景正确替换')
 }
 
+/**
+ * 测试13: 真实 OMML 公式节点 + 上标 → run 级替换的占位符桥接
+ *
+ * 修复前的行为：含上标的段落走 run 级替换，fullText 只含 w:t 文本节点、
+ * 不含 [[MATH:...]] token，而 original 里的字面 [[MATH:...]] 被烧进正则，
+ * 永远匹配不上 → 替换静默丢失。
+ * 修复后：占位符位置用 \s* 桥接，公式两侧的真实空格也能匹配。
+ */
+async function testRealMathNodeRunWithSuperscript() {
+  console.log('\n=== 测试13: 真实公式节点+上标 run 级桥接替换 ===')
+  const inputPath = path.join(TMP_DIR, 'test13_input.docx')
+  const outputPath = path.join(TMP_DIR, 'test13_output.docx')
+
+  const JSZip = require('jszip')
+  const zip = new JSZip()
+
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`)
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`)
+
+  // 段落结构: "测得" + oMath(x²拼接为x2) + " 的取值范围是"(带前导空格) + 上标"1"
+  // props.text = "测得[[MATH:x2]] 的取值范围是1"
+  zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">测得</w:t></w:r>
+      <m:oMath><m:r><m:t>x</m:t></m:r><m:r><m:t>2</m:t></m:r></m:oMath>
+      <w:r><w:t xml:space="preserve"> 的取值范围是</w:t></w:r>
+      <w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:t>1</w:t></w:r>
+    </w:p>
+    <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1800" w:bottom="1440" w:left="1800"/></w:sectPr>
+  </w:body>
+</w:document>`)
+
+  fs.writeFileSync(inputPath, await zip.generateAsync({ type: 'nodebuffer' }))
+
+  // original 与 props.text 一致（含占位符和公式后的真实空格）
+  await replaceTextInDocx(inputPath, outputPath, [
+    { original: '测得[[MATH:x2]] 的取值范围', suggested: '求得[[MATH:x2]] 的取值区间' }
+  ])
+
+  const paragraphs = await readDocxTextAndStyles(outputPath)
+  const p = paragraphs[0]
+  console.log('  段落文本:', JSON.stringify(p.text))
+
+  assertIncludes(p.text, '求得', '应替换"测得"为"求得"（修复前此处会静默失败）')
+  assertIncludes(p.text, '的取值区间', '应替换为"的取值区间"')
+  assertIncludes(p.text, '[[MATH:x2]]', '真实公式节点应保留（占位符仍在）')
+  assertIncludes(p.text, '是', '公式后未匹配文本应保留')
+
+  // 上标 run 保留
+  const supRun = p.runs.find(r => r.text === '1' && r.style.vertAlign === 'superscript')
+  assertOk(supRun, '上标 run "1" 应保留')
+
+  console.log('  ✅ 测试13通过: 真实公式节点+上标场景桥接替换正确')
+}
+
+/**
+ * 测试14: 真实 OMML 公式节点（无上标）→ 整段 props.text 替换路径
+ * 占位符作为 fixed token 由 ParagraphTextModel.setText 保留
+ */
+async function testRealMathNodeWholeParagraph() {
+  console.log('\n=== 测试14: 真实公式节点整段替换 ===')
+  const inputPath = path.join(TMP_DIR, 'test14_input.docx')
+  const outputPath = path.join(TMP_DIR, 'test14_output.docx')
+
+  const JSZip = require('jszip')
+  const zip = new JSZip()
+
+  zip.file('[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+</Types>`)
+  zip.file('_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`)
+
+  // props.text = "计算[[MATH:ab]] 结果如下"
+  zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">
+  <w:body>
+    <w:p>
+      <w:r><w:t xml:space="preserve">计算</w:t></w:r>
+      <m:oMath><m:r><m:t>a</m:t></m:r><m:r><m:t>b</m:t></m:r></m:oMath>
+      <w:r><w:t xml:space="preserve"> 结果如下</w:t></w:r>
+    </w:p>
+    <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1800" w:bottom="1440" w:left="1800"/></w:sectPr>
+  </w:body>
+</w:document>`)
+
+  fs.writeFileSync(inputPath, await zip.generateAsync({ type: 'nodebuffer' }))
+
+  await replaceTextInDocx(inputPath, outputPath, [
+    { original: '计算[[MATH:ab]] 结果', suggested: '求解[[MATH:ab]] 结果' }
+  ])
+
+  const paragraphs = await readDocxTextAndStyles(outputPath)
+  const p = paragraphs[0]
+  console.log('  段落文本:', JSON.stringify(p.text))
+
+  assertIncludes(p.text, '求解', '应替换"计算"为"求解"')
+  assertIncludes(p.text, '[[MATH:ab]]', '公式占位符应保留（公式节点未丢失）')
+  assertIncludes(p.text, '结果如下', '公式后文本应保留')
+
+  console.log('  ✅ 测试14通过: 真实公式节点整段替换正确')
+}
+
 // ====== 断言辅助 ======
 
 function assertIncludes(text, substring, msg) {
@@ -649,7 +769,9 @@ async function main() {
     testLengthChangeNearSubscript,
     testFootnoteNoVertAlignReplaceAfter,
     testFootnoteCrossBoundaryNoCrash,
-    testMathPlaceholderWithZeroWidth
+    testMathPlaceholderWithZeroWidth,
+    testRealMathNodeRunWithSuperscript,
+    testRealMathNodeWholeParagraph
   ]
   
   for (const test of tests) {

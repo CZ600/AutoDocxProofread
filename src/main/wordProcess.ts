@@ -13,6 +13,10 @@ function escapeRegExp(str: string): string {
 // 在 run 级别的 collectTextSegments 中不会包含脚注引用节点，因此 fullText 不含这些占位符
 // 需要在匹配前从 searchText 中 strip 掉
 const FOOTNOTE_PLACEHOLDER_RE = /\[\[FOOTNOTE_REF:\d+\]\]/g
+// 公式占位符同理：run 级 fullText 只收集 w:t 文本节点，不含 [[MATH:...]] token
+// （公式是独立的 math 子节点）。含上下角标且含公式的段落走 run 级替换时，
+// 若不从 search/replace 中剥离占位符，正则里的字面 [[MATH:...]] 永远匹配不上
+const MATH_PLACEHOLDER_RE = /\[\[MATH:[\s\S]*?\]\]/g
 
 /**
  * 零宽字符集：U+200B (零宽空格)、U+200C (零宽非连接符)、
@@ -29,8 +33,10 @@ function stripZeroWidth(text: string): string {
   return (text || '').replace(ZERO_WIDTH_CHARS_RE, '')
 }
 
-function stripFootnotePlaceholders(text: string): string {
-  return stripZeroWidth(text.replace(FOOTNOTE_PLACEHOLDER_RE, ''))
+function stripNonTextPlaceholders(text: string): string {
+  return stripZeroWidth(
+    text.replace(FOOTNOTE_PLACEHOLDER_RE, '').replace(MATH_PLACEHOLDER_RE, '')
+  )
 }
 
 function replaceFirstWhitespaceInsensitive(
@@ -69,6 +75,9 @@ function replaceFirstWhitespaceInsensitive(
  * 1. 包含上标/下标（vertAlign）的 run → setText() 会按字符数重分配，导致角标漂移
  * 2. 包含 footnoteReference / endnoteReference 子节点 → setText() 要求
  *    [[FOOTNOTE_REF:id]] 占位符完全保留，修改 props.text 时容易丢失
+ * 3. 包含数学公式（math）子节点 → docx-edit 的 patch 引擎对含 math 子节点的段落
+ *    有 hasStructuredInlineContent 门：props.text 的变更会被直接忽略（静默丢弃）。
+ *    只有直接修改 w:t 文本节点（children 路径）才能持久化。
  */
 function needsRunLevelReplacement(paraNode: any): boolean {
   function visit(parent: any): boolean {
@@ -89,6 +98,8 @@ function needsRunLevelReplacement(paraNode: any): boolean {
         }
       } else if (child.type === 'hyperlink') {
         if (visit(child)) return true
+      } else if (child.type === 'math') {
+        return true
       }
     }
     return false
@@ -157,14 +168,18 @@ function replaceInParagraphRuns(
   const fullText = segments.map(s => s.text).join('')
   if (!fullText) return false
 
-  // 空白不敏感匹配，同时 strip 脚注占位符（run 级别的 fullText 不含脚注引用）
-  // stripFootnotePlaceholders 内部已剥离零宽字符
-  const normalizedSearch = stripFootnotePlaceholders(searchText.trim())
-  if (!normalizedSearch) return false
+  // 空白不敏感匹配。脚注/公式占位符在 run 级 fullText（只含 w:t 文本）中不存在，
+  // 不能直接删除了事——占位符两侧在文档里可能有真实空格
+  // （如 "测得 [[MATH:x2]] 的"），直接拼接两侧文字会失配。
+  // 因此把占位符替换为 \u0000 哨兵，正则转义后再统一转为 \s* 桥接。
+  const bridged = stripZeroWidth(searchText.trim())
+    .replace(FOOTNOTE_PLACEHOLDER_RE, '\u0000')
+    .replace(MATH_PLACEHOLDER_RE, '\u0000')
+  if (!bridged.replace(/\u0000/g, '').trim()) return false
 
-  // replaceText 中也不能包含脚注占位符——脚注引用是独立的 XML 元素，
+  // replaceText 中不能包含脚注/公式占位符——它们是独立的 XML 元素，
   // 不在 w:t 文本节点中。写入时必须 strip，否则 doc.patch() 会产生乱码。
-  const cleanReplaceText = stripFootnotePlaceholders(replaceText)
+  const cleanReplaceText = stripNonTextPlaceholders(replaceText)
 
   // fullText（来自文档树）可能含 OMML 边界残留的零宽字符，而 normalizedSearch
   // 已被剥离。直接剥离 fullText 会破坏偏移量与 segments 的对应关系。
@@ -181,7 +196,10 @@ function replaceInParagraphRuns(
   // 末尾哨兵：cleanFullText.length 位置映射到 fullText.length
   indexMap[cleanFullText.length] = fullText.length
 
-  const pattern = escapeRegExp(normalizedSearch).replace(/\s+/g, '\\s+')
+  // 哨兵 → \s* 桥接占位符原来的位置；其余空白折叠为 \s+
+  const pattern = escapeRegExp(bridged)
+    .replace(/\u0000/g, '\\s*')
+    .replace(/[\s\u200B-\u200D\uFEFF]+/g, '\\s+')
   const regex = new RegExp(pattern)
   const match = cleanFullText.match(regex)
 
@@ -277,11 +295,13 @@ function collectAllParagraphs(node: any, result: any[] = []): any[] {
  * 使用 docx-edit 回写文档文本。
  *
  * 策略：
- * - 含上/下角标、脚注引用、尾注引用的段落：通过虚拟树 API 在 run 级别
+ * - 含上/下角标、脚注/尾注引用、数学公式的段落：通过虚拟树 API 在 run 级别
  *   修改 w:t 文本节点，不触发 ParagraphTextModel.setText() 的跨 run 字符数重分配，
  *   确保角标格式不会错位且脚注占位符不会丢失。
- * - 含数学公式或普通段落：使用 paragraph.props.text 的整段替换方式，
- *   ParagraphTextModel.setText() 会将 math/footnote 等作为 fixed token 保留。
+ *   注意公式段落必须走此路径：docx-edit 的 patch 引擎对含 math 子节点的段落
+ *   会忽略 paragraph.props.text 的变更（hasStructuredInlineContent 门），
+ *   整段替换方式对公式段落是静默丢失。
+ * - 普通段落：使用 paragraph.props.text 的整段替换方式（兼容 tab / break）。
  */
 export async function replaceTextInDocx(
   inputPath: string,

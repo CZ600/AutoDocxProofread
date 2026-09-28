@@ -87,17 +87,20 @@ AutoDocxProofread（智能校对）是一款专为长文档校对和论文格式
   - 错别字检测
   - 标点符号错误识别
   - 语法问题检测
+  - 表格内容校对：表格文字按行整理后参与校对，结果可在表格中高亮与替换
 
 - **知识库系统**：
   - 创建和管理多个本地知识库
   - 支持PDF、word和txt文档导入作为参考材料
   - 基于向量数据库的RAG检索增强生成算法
+  - 校对时可同时勾选多个知识库作为参考
 
 - **更快的处理速度和用户友好的操作体验**：
   - 使用并行处理的方式优化处理效率，显著提升对于长文本的校对速度
   - 清晰的错误展示和修改建议
   - 一键应用修改建议，一键导出修改后的文档
   - 校正参数可调，可以适应不同任务场景
+  - 最近文件列表，可快速重新打开校对过的文档
 
 - **便捷的 API 配置管理**：
   - 兼容openai接口，支持多种大语言模型 API
@@ -131,8 +134,8 @@ AutoDocxProofread（智能校对）是一款专为长文档校对和论文格式
 ### 3. 文档校对
 
 1. 选择"文档校对"选项卡
-2. 点击"选择 DOCX 文件"按钮选择要校对的 Word 文档
-3. （可选）选择知识库以增强校对准确性
+2. 点击"选择 DOCX 文件"按钮选择要校对的 Word 文档（按钮旁的下拉箭头可快速打开最近校对过的文件）
+3. （可选）勾选一个或多个知识库以增强校对准确性
 4. 选择合适的校对模式：
    - **逐句精校**：适合需要高精度校对的短文本
    - **逐段校正**：适合长篇文献的校对
@@ -170,7 +173,9 @@ AutoDocxProofread（智能校对）是一款专为长文档校对和论文格式
   - 提高rag功能的可用性
 - v1.2.0
   - 优化安装包体积
-  - 优化段落识别效果
+  - 优化降低ai率的效果
+  - 优化段落识别效果和文档结构识别、段落匹配的准确率
+  - 优化RAG检索效果
 - v1.1.9
   - 更新了ai格式解析功能
   - 修复了claude接口的可用性
@@ -214,9 +219,9 @@ AutoDocxProofread（智能校对）是一款专为长文档校对和论文格式
 
 - **主框架**：[Electron](https://www.electronjs.org/) + [Vue 3](https://vuejs.org/) + [TypeScript](https://www.typescriptlang.org/)
 - **UI 组件库**：[Element Plus](https://element-plus.org/)
-- **构建工具**：[Vite](https://vitejs.dev/) + [Electron Forge](https://www.electronforge.io/)
+- **构建工具**：[electron-vite](https://electron-vite.org/) + [electron-builder](https://www.electron.build/)
 - **文档处理**：[Mammoth](https://github.com/mwilliamson/mammoth.js) + [Docxtemplater](https://github.com/open-xml-templating/docxtemplater)
-- **向量数据库**：[LanceDB](https://lancedb.com/)
+- **向量检索**：[sqlite-vec](https://github.com/asg017/sqlite-vec) 扩展（基于 sqlite3 的本地向量存储）
 - **代码规范**：[ESLint](https://eslint.org/) + [Prettier](https://prettier.io/)
 - **版本管理**：[Standard Version](https://github.com/conventional-changelog/standard-version)
 

@@ -35,6 +35,8 @@ interface DocumentSection {
   title: string
   content: string
   level: number
+  /** 表格内容独立成节的标记：正文流不拼接表格段落，降低AI率等改写流程须跳过 */
+  isTable?: boolean
 }
 
 interface DocumentStructure {
@@ -324,8 +326,11 @@ export async function resetPromptSettings(): Promise<boolean> {
 // docx-edit 的 getText() 会将脚注引用输出为 [[FOOTNOTE_REF:id]]
 // 发给 LLM 前替换为 [脚注id]，LLM 返回后还原回 [[FOOTNOTE_REF:id]]
 
-const FOOTNOTE_HUMAN_RE = /\[脚注(\d+)\]/g
-const MATH_HUMAN_RE = /\[公式(.*?)\]/g
+// LLM 返回的标记常与指令有细微出入（全角括号 ［公式x］、标记与内容间的空格），
+// 还原正则统一容忍这些变体，否则还原失败会把字面 "[公式 x]" 留在 original 中，
+// 前端匹配与导出回写都会静默失败
+const FOOTNOTE_HUMAN_RE = /[［[]\s*脚注\s*(\d+)\s*[\]］]/g
+const MATH_HUMAN_RE = /[［[]\s*公式\s*([\s\S]*?)\s*[\]］]/g
 
 /**
  * 零宽字符集：U+200B (零宽空格)、U+200C (零宽非连接符)、
@@ -372,7 +377,8 @@ function footnoteHumanToPlaceholder(text: string): string {
  *    普通的方括号文本冲突，加"公式"前缀可避免误还原。
  */
 function mathPlaceholderToHuman(text: string): string {
-  return text.replace(/[\u200B-\u200D\uFEFF]*\[\[MATH:(.*?)\]\][\u200B-\u200D\uFEFF]*/g, '[公式$1]')
+  // [\s\S]*?：公式文本是全部 m:t 的直接拼接，可能含换行
+  return text.replace(/[\u200B-\u200D\uFEFF]*\[\[MATH:([\s\S]*?)\]\][\u200B-\u200D\uFEFF]*/g, '[公式$1]')
 }
 
 /** 将 [公式C] 还原为 [[MATH:C]]，解析 LLM 返回结果后调用 */
@@ -452,6 +458,104 @@ function isParagraphInTableCell(para: any): boolean {
     node = node.parent
   }
   return false
+}
+
+// ====== 表格内容收集 ======
+
+/**
+ * 判断文本是否含实际文字（中文或字母）。
+ * 表格中的纯数字/符号单元格（如 "3.2"、"85%"、"-"）无校对价值，
+ * 整行过滤可避免把它们送进 LLM 浪费请求。
+ */
+function hasReadableText(text: string): boolean {
+  return /[\u4e00-\u9fffA-Za-z]/.test(text)
+}
+
+/**
+ * 判断 table controller 是否嵌套在另一个表格内。
+ * body.getTables() 返回全部后代表格（含嵌套表），而外层表格的
+ * cell.getParagraphs() 已经包含嵌套表内容，为避免重复收集只处理顶层表格。
+ */
+function isNestedTable(table: any): boolean {
+  let node = table.vnode?.parent
+  while (node) {
+    if (node.type === 'table') return true
+    node = node.parent
+  }
+  return false
+}
+
+/**
+ * 将文档中的表格收集为独立 section，与正文章节并列送 LLM 校对。
+ *
+ * 此前 extractDocxEditHeadings 直接跳过表格单元格段落（避免碎行打乱
+ * 正文 section 拼接与匹配），副作用是表格文字完全不被校对。现在改为：
+ * 正文流照旧不含表格段落，表格按"每行一行、单元格用 \t 连接"整理成
+ * 独立 section。校对产生的 original 因此始终落在单个单元格段落内，
+ * 前端预览高亮（TreeWalker 遍历全部文本节点）和导出回写
+ * （wordProcess.collectAllParagraphs 递归表格单元格）均可直接匹配。
+ *
+ * 纯数字/符号行（无中文和字母）不收集。
+ */
+function collectTableSections(body: any): DocumentSection[] {
+  let tables: any[] = []
+  try {
+    tables = body.getTables() || []
+  } catch {
+    return []
+  }
+
+  const sections: DocumentSection[] = []
+  let tableIndex = 0
+
+  for (const table of tables) {
+    if (isNestedTable(table)) continue
+    tableIndex += 1
+
+    let rows: any[] = []
+    try {
+      rows = table.getRows() || []
+    } catch {
+      rows = []
+    }
+
+    const lines: string[] = []
+    for (const row of rows) {
+      let cells: any[] = []
+      try {
+        cells = row.getCells() || []
+      } catch {
+        cells = []
+      }
+      const cellTexts = cells.map(cell => {
+        let paras: any[] = []
+        try {
+          paras = cell.getParagraphs() || []
+        } catch {
+          paras = []
+        }
+        return paras
+          .map(p => stripZeroWidth(typeof p.getText === 'function' ? p.getText() : ''))
+          .filter(t => t.trim().length > 0)
+          .join(' ')
+      })
+      const line = cellTexts.join('\t')
+      if (hasReadableText(line)) {
+        lines.push(line)
+      }
+    }
+
+    if (lines.length > 0) {
+      sections.push({
+        title: `表格 ${tableIndex}`,
+        content: lines.join('\n'),
+        level: 2,
+        isTable: true
+      })
+    }
+  }
+
+  return sections
 }
 
 // ====== 目录（Table of Contents）检测 ======
@@ -577,7 +681,8 @@ function stripAutoNumbering(text: string): string {
 }
 
 // ====== docx-edit 提取标题 ======
-async function extractDocxEditHeadings(documentPath: string): Promise<DocumentStructure | null> {
+// 导出供集成测试使用（表格章节收集逻辑的验证入口）
+export async function extractDocxEditHeadings(documentPath: string): Promise<DocumentStructure | null> {
   try {
     const doc = await loadDocx(documentPath)
     const body = doc.getBody()
@@ -623,6 +728,14 @@ async function extractDocxEditHeadings(documentPath: string): Promise<DocumentSt
     }
 
     if (!foundHeadings) return null
+
+    // 表格文字独立成节（正文流仍跳过表格段落，见 isParagraphInTableCell），
+    // 使表格内容也进入校对，同时不打乱正文章节的段落拼接
+    const tableSections = collectTableSections(body)
+    if (tableSections.length > 0) {
+      sections.push(...tableSections)
+      console.log(`[大纲提取] 额外收集 ${tableSections.length} 个表格章节参与校对`)
+    }
 
     return { title: documentTitle, sections }
   } catch {
@@ -1226,8 +1339,18 @@ export async function proofreadDocument(
     } else if (mode === 'sentence') {
       const sentenceTasks: (() => Promise<{ result: ProofreadingCorrection[]; use_tokens: number }>)[] = []
       for (const section of nonEmptySections) {
-        const sentences = splitSentences(section.content)
-        const validSentences = sentences.filter(s => s.trim().length > 0)
+        // 先按行/制表符拆分再切句：
+        // 1. 表格 section 的每行是 \t 连接的单元格，拆分后校对单元落在单个单元格内，
+        //    LLM 返回的 original 才能匹配到具体段落完成回写；
+        // 2. 正文章节中无结尾标点的段落也不会被合并成一个请求单元，
+        //    避免产生跨段落的 original 导致替换静默失败。
+        const sentenceUnits = section.content
+          .split(/[\n\t]/)
+          .flatMap(line => splitSentences(line))
+        // 纯数字/符号单元（如表格中的 "3.2"、"85%"）不送 LLM
+        const validSentences = sentenceUnits.filter(
+          s => s.trim().length > 0 && hasReadableText(s)
+        )
         if (validSentences.length === 0) continue
 
         for (const sentence of validSentences) {
@@ -1363,7 +1486,7 @@ function isMostlyEnglishText(paragraph: string): boolean {
   // 移除脚注/公式占位符，避免影响字符统计
   const cleaned = paragraph
     .replace(/\[\[FOOTNOTE_REF:\d+\]\]/g, '')
-    .replace(/\[\[MATH:.*?\]\]/g, '')
+    .replace(/\[\[MATH:[\s\S]*?\]\]/g, '')
 
   const latinChars = (cleaned.match(/[A-Za-z]/g) || []).length
   // 中日韩统一表意文字（基本覆盖中文）
@@ -1433,6 +1556,9 @@ export async function reduceAIDetectionDocument(
     let inReferenceSection = false
 
     for (const section of docStructure.sections) {
+      // 表格是数据内容（实验数据、参数列表等），按段落改写会破坏数据准确性，
+      // 降低AI率流程整体跳过表格章节
+      if (section.isTable) continue
       if (isReferenceSection(section.title)) {
         inReferenceSection = true
         continue
