@@ -12,7 +12,7 @@
         <span>{{ dialogTitle }}</span>
       </div>
     </template>
-    <el-form :model="formData" label-position="top" class="dialog-form">
+    <el-form ref="formRef" :model="formData" :rules="formRules" label-position="top" class="dialog-form">
       <el-form-item :label="t('addApiDialog.providerLabel')" class="form-item">
         <el-select v-model="formData.provider" @change="handleProviderChange" class="w-full">
           <el-option
@@ -23,7 +23,7 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item v-if="showURLField" :label="t('addApiDialog.urlLabel')" class="form-item">
+      <el-form-item v-if="showURLField" prop="URL" :label="t('addApiDialog.urlLabel')" class="form-item">
         <div class="input-tip">
           <el-icon class="tip-icon"><InfoFilled /></el-icon>
           <span>{{
@@ -34,7 +34,7 @@
         </div>
         <el-input v-model="formData.URL" :placeholder="t('addApiDialog.urlPlaceholder')" :prefix-icon="Link" />
       </el-form-item>
-      <el-form-item :label="t('addApiDialog.keyLabel')" class="form-item">
+      <el-form-item prop="key" :label="t('addApiDialog.keyLabel')" class="form-item">
         <el-input
           v-model="formData.key"
           type="password"
@@ -43,7 +43,7 @@
           :prefix-icon="Lock"
         />
       </el-form-item>
-      <el-form-item :label="t('addApiDialog.modelLabel')" class="form-item">
+      <el-form-item prop="name" :label="t('addApiDialog.modelLabel')" class="form-item">
         <div class="input-tip">
           <el-icon class="tip-icon"><InfoFilled /></el-icon>
           <span>{{ t('addApiDialog.defaultModelTip', { model: defaultModelForProvider }) }}</span>
@@ -67,6 +67,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { FormInstance, FormItemRule, FormRules } from 'element-plus'
 import { Plus, Edit, Link, Lock, Cpu, InfoFilled } from '@element-plus/icons-vue'
 import { useApiSettings, type ApiFormData } from '../../composables/useApiSettings'
 import {
@@ -114,6 +115,51 @@ const showURLField = computed(() => {
   return requiresBaseURL(formData.provider)
 })
 
+// ---- 表单校验：此前空 URL/key 也能保存，这里补齐必填与格式校验 ----
+const formRef = ref<FormInstance>()
+
+const isValidHttpUrl = (value: string) => {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+const validateURL = (_rule: FormItemRule, value: string, callback: (error?: Error) => void) => {
+  const url = (value || '').trim()
+  if (!url) {
+    // 该字段仅在 provider 需要 baseURL 时渲染，必填校验交给 required 规则
+    callback()
+    return
+  }
+  if (isValidHttpUrl(url)) {
+    callback()
+  } else {
+    callback(new Error(t('addApiDialog.validURLFormat')))
+  }
+}
+
+const formRules = computed<FormRules>(() => ({
+  URL: [
+    { required: showURLField.value, message: t('addApiDialog.validURLRequired'), trigger: 'blur' },
+    { validator: validateURL, trigger: 'blur' }
+  ],
+  key: [{ required: true, message: t('addApiDialog.validKeyRequired'), trigger: 'blur' }],
+  name: [{ required: true, message: t('addApiDialog.validNameRequired'), trigger: 'blur' }]
+}))
+
+const validateForm = async (): Promise<boolean> => {
+  if (!formRef.value) return true
+  try {
+    await formRef.value.validate()
+    return true
+  } catch {
+    return false
+  }
+}
+
 const defaultModelForProvider = computed(() => {
   return getProviderDefaultModel(formData.provider)
 })
@@ -139,6 +185,7 @@ const resetForm = () => {
   formData.key = ''
   formData.name = ''
   formData.provider = ModelProvider.OPENAI_COMPATIBLE
+  formRef.value?.clearValidate()
 }
 
 const syncFormData = () => {
@@ -152,6 +199,7 @@ const syncFormData = () => {
     formData.key = props.initialData.key || ''
     formData.name = props.initialData.name || ''
     formData.provider = props.initialData.provider || ModelProvider.OPENAI_COMPATIBLE
+    formRef.value?.clearValidate()
     return
   }
 
@@ -178,6 +226,7 @@ const handleClose = () => {
 }
 
 const handleSubmit = async () => {
+  if (!(await validateForm())) return
   submitting.value = true
   try {
     emit('submit', {
@@ -206,6 +255,7 @@ const handleReset = () => {
 }
 
 const handleTest = async () => {
+  if (!(await validateForm())) return
   testing.value = true
   try {
     await testApiConnection({

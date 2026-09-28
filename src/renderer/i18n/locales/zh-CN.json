@@ -516,7 +516,11 @@
     "cancel": "取消",
     "testConnection": "测试连通性",
     "saveEdit": "保存修改",
-    "save": "保存"
+    "save": "保存",
+    "validURLRequired": "请输入 API 地址",
+    "validURLFormat": "API 地址格式不正确，需以 http:// 或 https:// 开头",
+    "validKeyRequired": "请输入 API 密钥",
+    "validNameRequired": "请输入模型名称"
   },
   "rateLimit": {
     "title": "请求频率限制",

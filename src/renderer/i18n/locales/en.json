@@ -516,7 +516,11 @@
     "cancel": "Cancel",
     "testConnection": "Test Connection",
     "saveEdit": "Save Changes",
-    "save": "Save"
+    "save": "Save",
+    "validURLRequired": "Please enter the API URL",
+    "validURLFormat": "Invalid API URL, must start with http:// or https://",
+    "validKeyRequired": "Please enter the API key",
+    "validNameRequired": "Please enter the model name"
   },
   "rateLimit": {
     "title": "Rate Limit",
