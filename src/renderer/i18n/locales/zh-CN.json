@@ -8,6 +8,12 @@
       "settings": "功能设置",
       "about": "关于应用",
       "themeToggle": "明暗模式切换"
+    },
+    "window": {
+      "minimize": "最小化",
+      "maximize": "最大化",
+      "restore": "还原",
+      "close": "关闭"
     }
   },
   "proof": {

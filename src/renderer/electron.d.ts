@@ -202,6 +202,13 @@ export default interface ElectronApi {
   }>
 
   sendLocale: (locale: string) => void
+
+  // 窗口控制接口
+  minimizeWindow: () => Promise<void>
+  toggleMaximizeWindow: () => Promise<boolean>
+  closeWindow: () => Promise<void>
+  isWindowMaximized: () => Promise<boolean>
+  onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
 }
 
 declare global {

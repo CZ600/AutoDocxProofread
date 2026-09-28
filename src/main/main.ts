@@ -61,15 +61,8 @@ const createWindow = () => {
       contextIsolation: true
     },
     // 设置窗口样式
-    // remove the default titlebar
-    titleBarStyle: 'hidden',
-    // expose window controls in Windows/Linux
-    ...(process.platform !== 'darwin' ? { titleBarOverlay: true } : {}),
-    titleBarOverlay: {
-      color: 'rgba(255, 255, 255, 0)',
-      symbolColor: '#807e85ff',
-      height: 52
-    }
+    // remove the default titlebar；窗口控制按钮由渲染层 top-toolbar 内的自定义按钮提供
+    titleBarStyle: 'hidden'
   })
 
   // load the index.html of the app.
@@ -84,6 +77,15 @@ const createWindow = () => {
 
   mainWindow.maximize()
   mainWindow.show()
+
+  // 最大化状态变化时通知渲染端，用于切换最大化/还原图标
+  const sendMaximizeState = () => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('window:maximizeChanged', mainWindow.isMaximized())
+    }
+  }
+  mainWindow.on('maximize', sendMaximizeState)
+  mainWindow.on('unmaximize', sendMaximizeState)
 }
 
 app.whenReady().then(async () => {

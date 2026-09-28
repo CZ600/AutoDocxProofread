@@ -8,6 +8,12 @@
       "settings": "Settings",
       "about": "About",
       "themeToggle": "Toggle Dark/Light Mode"
+    },
+    "window": {
+      "minimize": "Minimize",
+      "maximize": "Maximize",
+      "restore": "Restore",
+      "close": "Close"
     }
   },
   "proof": {

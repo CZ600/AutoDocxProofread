@@ -17,6 +17,7 @@ const proofreadStreamListeners = new WeakMap<
   (_event: any, payload: ProofreadStreamPayload) => void
 >()
 
+const WINDOW_MAXIMIZE_CHANNEL = 'window:maximizeChanged'
 
 // contextBridge.exposeInMainWorld 是一个安全机制，它允许你在预加载脚本中定义一些函数或对象，并将它们注入到网页的全局 window 对象中。
 // 第一个参数 electronAPI 表示将要挂载到window上的属性名称
@@ -203,6 +204,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectFormatDescFile: () =>
     ipcRenderer.invoke('select-format-desc-file'),
   sendLocale: (locale: string) => ipcRenderer.send('set-locale', locale),
+  // 窗口控制：自定义标题栏按钮（top-toolbar 右上角）
+  minimizeWindow: () => ipcRenderer.invoke('window:minimize'),
+  toggleMaximizeWindow: () => ipcRenderer.invoke('window:toggleMaximize'),
+  closeWindow: () => ipcRenderer.invoke('window:close'),
+  isWindowMaximized: () => ipcRenderer.invoke('window:isMaximized'),
+  onWindowMaximizeChange: (callback: (isMaximized: boolean) => void) => {
+    const listener = (_event: any, isMaximized: boolean) => {
+      callback(isMaximized)
+    }
+    ipcRenderer.on(WINDOW_MAXIMIZE_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(WINDOW_MAXIMIZE_CHANNEL, listener)
+    }
+  },
   // SmartFormatAgent
   smartFormatAnalyze: (params: any) => ipcRenderer.invoke('smart-format-analyze', params),
   smartFormatApply: (params: any) => ipcRenderer.invoke('smart-format-apply', params)
