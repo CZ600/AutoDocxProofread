@@ -6,7 +6,7 @@
       <div class="input-section" :class="{ expand: formatItems.length === 0 && defaults === null }">
         <!-- Reference doc selector -->
         <div class="input-row">
-          <span class="input-label">📄 参考文档</span>
+          <span class="input-label">📄 {{ t('proof.formatClone.refDocLabel') }}</span>
           <el-button size="small" @click="selectRefFile" :loading="selectingRef">
             {{ t('proof.formatClone.selectRef') }}
           </el-button>
@@ -14,7 +14,7 @@
             <el-tooltip :content="refFileName" placement="bottom">
               <span class="ref-file-name">{{ truncatedName(refFileName) }}</span>
             </el-tooltip>
-            <el-tooltip content="清除参考文档" placement="bottom">
+            <el-tooltip :content="t('proof.formatClone.clearRefTip')" placement="bottom">
               <el-icon class="clear-icon" @click="clearRefFile"><CircleClose /></el-icon>
             </el-tooltip>
           </template>
@@ -22,7 +22,7 @@
 
         <!-- Description file selector -->
         <div class="input-row">
-          <span class="input-label">📝 格式描述</span>
+          <span class="input-label">📝 {{ t('proof.formatClone.descLabel') }}</span>
           <el-button size="small" @click="selectDescFile" :loading="selectingDescFile">
             {{ t('proof.formatFromDesc.selectFile') }}
           </el-button>
@@ -30,7 +30,7 @@
             <el-tooltip :content="descFileName" placement="bottom">
               <span class="ref-file-name">{{ truncatedName(descFileName) }}</span>
             </el-tooltip>
-            <el-tooltip content="清除格式描述文件" placement="bottom">
+            <el-tooltip :content="t('proof.formatClone.clearDescTip')" placement="bottom">
               <el-icon class="clear-icon" @click="clearDescFile"><CircleClose /></el-icon>
             </el-tooltip>
           </template>
@@ -56,7 +56,7 @@
               :loading="analyzing"
               :disabled="!targetFilePath || (!refFilePath && !descText.trim())"
             >
-              {{ analyzing ? '分析中...' : '开始分析格式' }}
+              {{ analyzing ? t('proof.formatClone.analyzing') : t('proof.formatClone.startAnalyze') }}
             </el-button>
             <el-progress
               v-if="analyzing"
@@ -65,7 +65,7 @@
               :show-text="false"
               class="inline-progress-bar"
             />
-            <span v-if="!targetFilePath" class="hint-text">请先在预览区打开一个目标文档</span>
+            <span v-if="!targetFilePath" class="hint-text">{{ t('proof.formatClone.openTargetFirst') }}</span>
           </div>
         </template>
       </div>
@@ -74,7 +74,7 @@
       <template v-if="formatItems.length > 0 || defaults">
         <!-- Agent flow summary -->
         <div v-if="flowType === 'agent' && agentTokenUsage > 0" class="result-summary">
-          已识别 {{ formatItems.length }} 种段落类型 | Token: {{ agentTokenUsage }}
+          {{ t('proof.formatClone.recognizedSummary', { count: formatItems.length, tokens: agentTokenUsage }) }}
         </div>
 
         <!-- Editable formatItems list -->
@@ -372,8 +372,8 @@
         <!-- Output mode (agent flow only) + Apply/Export buttons -->
         <div v-if="formatItems.length > 0" class="action-bar-bottom">
           <el-radio-group v-if="flowType === 'agent'" v-model="outputMode" size="small">
-            <el-radio value="new">导出为新文件</el-radio>
-            <el-radio value="overwrite">覆盖原文件</el-radio>
+            <el-radio value="new">{{ t('proof.formatClone.exportNewFile') }}</el-radio>
+            <el-radio value="overwrite">{{ t('proof.formatClone.overwriteOriginal') }}</el-radio>
           </el-radio-group>
           <!-- 强制覆盖选项（仅简单克隆流程可用） -->
           <div v-if="flowType === 'simple'" class="force-overwrite-row">
@@ -383,18 +383,18 @@
             >
               <template #content>
                 <div class="force-tooltip-content">
-                  <p><strong>⚠️ 强制覆盖行内格式</strong></p>
-                  <p>开启后，会将参考文档的格式强制应用到目标文档的每个段落，覆盖段落上已有的手动格式设置。</p>
-                  <p><strong>风险：</strong></p>
+                  <p><strong>⚠️ {{ t('proof.formatClone.forceOverwrite') }}</strong></p>
+                  <p>{{ t('proof.formatClone.forceDesc') }}</p>
+                  <p><strong>{{ t('proof.formatClone.forceRisk') }}</strong></p>
                   <ul>
-                    <li>会覆盖您在段落上手动设置的特殊格式</li>
-                    <li>被覆盖的格式无法通过修改样式恢复</li>
+                    <li>{{ t('proof.formatClone.forceRisk1') }}</li>
+                    <li>{{ t('proof.formatClone.forceRisk2') }}</li>
                   </ul>
-                  <p><strong>适用场景：</strong>目标文档的段落格式无法通过修改样式生效时使用。</p>
+                  <p><strong>{{ t('proof.formatClone.forceScenePrefix') }}</strong>{{ t('proof.formatClone.forceScene') }}</p>
                 </div>
               </template>
               <el-checkbox v-model="forceOverwrite" size="small">
-                强制覆盖行内格式
+                {{ t('proof.formatClone.forceOverwrite') }}
                 <el-icon class="info-icon"><QuestionFilled /></el-icon>
               </el-checkbox>
             </el-tooltip>
@@ -435,6 +435,7 @@ import { QuestionFilled, CircleClose } from '@element-plus/icons-vue'
 import { useApiStore } from '../stores/apiStore'
 import { fileInfoStore } from '../stores/store'
 import { renderAsync } from 'docx-preview'
+import { applyPreviewPerfHints } from '../utils/previewPerf'
 
 const emit = defineEmits(['back'])
 
@@ -673,6 +674,8 @@ const renderPreview = async (filePath) => {
   if (container) {
     container.innerHTML = ''
     await renderAsync(file, container)
+    // 与校对预览一致的大文档优化：视口外页面跳过渲染
+    applyPreviewPerfHints(container)
   }
 }
 
@@ -770,7 +773,7 @@ const clearRefFile = () => {
     agentClassification.value = null
     agentTokenUsage.value = 0
   }
-  ElMessage.success('已清除参考文档')
+  ElMessage.success(t('proof.formatClone.clearedRef'))
 }
 
 const clearDescFile = () => {
@@ -786,7 +789,7 @@ const clearDescFile = () => {
     agentClassification.value = null
     agentTokenUsage.value = 0
   }
-  ElMessage.success('已清除格式描述')
+  ElMessage.success(t('proof.formatClone.clearedDesc'))
 }
 
 // ---- Unified start function ----
@@ -796,12 +799,12 @@ const startFormat = async () => {
   const hasDesc = descText.value.trim() !== ''
 
   if (!hasRef && !hasDesc) {
-    ElMessage.warning('请选择参考文档或输入格式描述')
+    ElMessage.warning(t('proof.formatClone.needRefOrDesc'))
     return
   }
 
   if (!targetFilePath.value) {
-    ElMessage.warning('请先在预览区打开一个目标文档')
+    ElMessage.warning(t('proof.formatClone.openTargetFirst'))
     return
   }
 
@@ -858,12 +861,12 @@ const agentFlow = async () => {
       if (formatItems.value.length > 0) activeNames.value = [0]
       if (defaults.value) defaultsActive.value = ['defaults']
 
-      ElMessage.success(`分析完成，识别到 ${formatItems.value.length} 种段落类型`)
+      ElMessage.success(t('proof.formatClone.analyzeDone', { count: formatItems.value.length }))
     } else {
-      ElMessage.error(result.error || '分析失败')
+      ElMessage.error(result.error || t('proof.formatClone.analyzeFailed'))
     }
   } catch (e) {
-    ElMessage.error('分析出错: ' + (e.message || String(e)))
+    ElMessage.error(t('proof.formatClone.analyzeError') + (e.message || String(e)))
   } finally {
     clearInterval(progressInterval)
     progressPercent.value = 100
@@ -906,11 +909,16 @@ const doClone = async () => {
         clonedFilePath.value = result.filePath || outputPath
         await renderPreview(result.filePath || outputPath)
         ElMessage.success(
-          `格式应用完成！${result.appliedParagraphs || 0} 个段落已调整，内容完整性: ${result.contentPreserved ? '是' : '否'}`
+          t('proof.formatClone.applyDone', {
+            paragraphs: result.appliedParagraphs || 0,
+            preserved: result.contentPreserved
+              ? t('proof.formatClone.preservedYes')
+              : t('proof.formatClone.preservedNo')
+          })
         )
       } else {
         console.error('[FormatClone] smartFormatApply failed:', result.error)
-        ElMessage.error('格式克隆失败: ' + (result.error || '未知错误'))
+        ElMessage.error(t('proof.formatClone.cloneFailed') + (result.error || t('proof.formatClone.unknownError')))
       }
     } else {
       // Simple clone flow
@@ -925,9 +933,11 @@ const doClone = async () => {
           const matchedStyles = result.matchedStyles || 0
           const appliedParagraphs = result.appliedParagraphs || 0
           if (matchedStyles === 0) {
-            ElMessage.warning(`格式克隆完成！未匹配到参考样式，已使用默认格式覆盖 ${appliedParagraphs} 个段落`)
+            ElMessage.warning(t('proof.formatClone.cloneDefaultOnly', { paragraphs: appliedParagraphs }))
           } else {
-            ElMessage.success(`格式克隆完成！匹配到 ${matchedStyles} 个样式，已强制覆盖 ${appliedParagraphs} 个段落`)
+            ElMessage.success(
+              t('proof.formatClone.cloneForced', { styles: matchedStyles, paragraphs: appliedParagraphs })
+            )
           }
         }
       } else {
