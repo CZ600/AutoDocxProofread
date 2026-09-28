@@ -98,7 +98,11 @@
       "reviewFiltered": "审核已过滤 {count} 条无效建议",
       "undoSuccess": "已撤销修改",
       "undoAllSuccess": "已撤销全部修改",
-      "noAppliedChanges": "没有已应用的修改"
+      "noAppliedChanges": "没有已应用的修改",
+      "ignored": "已忽略该条建议，可随时取消忽略",
+      "unignored": "已恢复该条建议",
+      "editSaved": "修改建议已更新",
+      "editEmpty": "建议内容不能为空"
     },
     "formatClone": {
       "title": "格式克隆",
@@ -124,7 +128,14 @@
       "generateFailed": "格式参数生成失败",
       "readFileFailed": "读取文件失败",
       "emptyDesc": "请输入格式描述"
-    }
+    },
+    "ignore": "忽略",
+    "unignore": "取消忽略",
+    "rejectedTag": "已忽略",
+    "editedTag": "已编辑",
+    "editSuggested": "编辑建议内容",
+    "saveEdit": "保存",
+    "cancelEdit": "取消"
   },
   "apiSettings": {
     "tabAPI": "API设置",

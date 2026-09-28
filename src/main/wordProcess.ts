@@ -39,31 +39,26 @@ function stripNonTextPlaceholders(text: string): string {
   )
 }
 
-function replaceFirstWhitespaceInsensitive(
-  text: string,
-  searchValue: string,
-  replacement: string
-): { count: number; text: string } {
-  // 文档文本与 searchValue 都剥离零宽字符后再匹配，
-  // 避免 OMML 边界残留的 U+200B 等导致静默不匹配。
-  const haystack = stripZeroWidth(text)
+/**
+ * 构建空白不敏感、占位符感知的匹配正则源码（供 RegExp 使用）。
+ * - 零宽字符在匹配前从两端剥离，残余的作为空白吞掉
+ * - 脚注/公式占位符（[[FOOTNOTE_REF:x]] / [[MATH:...]]）替换为 \u0000 哨兵，
+ *   再转为 \s* 桥接：占位符在 run 级 w:t 文本中不存在，但占位符两侧在文档里
+ *   可能有真实空格（如 "测得 [[MATH:x2]] 的"），直接拼接两侧文字会失配
+ * - 常规空白折叠为 \s+
+ *
+ * 返回 null 表示搜索串剥掉占位符后没有实际内容（无法匹配）。
+ */
+function buildSearchPattern(searchValue: string): string | null {
   const normalizedSearch = stripZeroWidth(searchValue.trim())
-  if (!normalizedSearch) {
-    return { count: 0, text }
+    .replace(FOOTNOTE_PLACEHOLDER_RE, '\u0000')
+    .replace(MATH_PLACEHOLDER_RE, '\u0000')
+  if (!normalizedSearch.replace(/\u0000/g, '').trim()) {
+    return null
   }
-
-  // 空白折叠为 \s+，同时吞掉残余的零宽字符（双重保险）
-  const pattern = escapeRegExp(normalizedSearch).replace(/[\s\u200B-\u200D\uFEFF]+/g, '\\s+')
-  const regex = new RegExp(pattern)
-
-  if (!regex.test(haystack)) {
-    return { count: 0, text }
-  }
-
-  return {
-    count: 1,
-    text: haystack.replace(regex, replacement)
-  }
+  return escapeRegExp(normalizedSearch)
+    .replace(/\u0000/g, '\\s*')
+    .replace(/[\s\u200B-\u200D\uFEFF]+/g, '\\s+')
 }
 
 // ====== Run 级别文本替换（保留上下角标格式） ======
@@ -147,119 +142,107 @@ function collectTextSegments(paraNode: any): TextSegment[] {
 }
 
 /**
- * 在段落内执行 run 级别的文本替换，保留每个 run 的格式（上下角标、加粗等）。
- *
- * 核心原理：仅修改 w:t 文本节点的 props.text，不修改 paragraph.props.text。
- * 这使得 patch 引擎在处理时走 children 路径而非 setText() 路径，
- * 从而避免了 ParagraphTextModel.setText() 按原始字符数重分配文本导致的
- * 格式边界错位问题。
- *
- * 局限性：当匹配跨越 tab / break 等非文本节点时，可能无法匹配成功。
- * 对于校对场景，这种情况极少出现。
+ * 段落快照：替换前记录段落的原始文本与定位所需的映射。
+ * 重复文本按出现次序分配时，必须始终在"未修改的原始文本"上枚举匹配——
+ * 若在已被先前替换改写的文本上匹配，替换后仍含搜索串的文本（如
+ * "提出"→"提出了"）会再次命中，导致后续替换错位。
  */
-function replaceInParagraphRuns(
-  paraNode: any,
-  searchText: string,
-  replaceText: string
-): boolean {
-  const segments = collectTextSegments(paraNode)
-  if (segments.length === 0) return false
+interface ParaSnapshot {
+  node: any
+  needsRunLevel: boolean
+  segments: TextSegment[] // run 级段落的 w:t 片段（普通段落为空）
+  originalText: string // 普通段落 = props.text；run 级 = w:t 拼接
+  cleanText: string // 剥离零宽后的文本（匹配在此坐标系进行）
+  indexMap: number[] // indexMap[i] = cleanText[i] 在 originalText 中的位置
+}
 
-  const fullText = segments.map(s => s.text).join('')
-  if (!fullText) return false
+function buildParaSnapshot(paraNode: any): ParaSnapshot {
+  const needsRunLevel = needsRunLevelReplacement(paraNode)
+  const segments = needsRunLevel ? collectTextSegments(paraNode) : []
+  const originalText = needsRunLevel
+    ? segments.map(s => s.text).join('')
+    : paraNode.props.text || ''
 
-  // 空白不敏感匹配。脚注/公式占位符在 run 级 fullText（只含 w:t 文本）中不存在，
-  // 不能直接删除了事——占位符两侧在文档里可能有真实空格
-  // （如 "测得 [[MATH:x2]] 的"），直接拼接两侧文字会失配。
-  // 因此把占位符替换为 \u0000 哨兵，正则转义后再统一转为 \s* 桥接。
-  const bridged = stripZeroWidth(searchText.trim())
-    .replace(FOOTNOTE_PLACEHOLDER_RE, '\u0000')
-    .replace(MATH_PLACEHOLDER_RE, '\u0000')
-  if (!bridged.replace(/\u0000/g, '').trim()) return false
-
-  // replaceText 中不能包含脚注/公式占位符——它们是独立的 XML 元素，
-  // 不在 w:t 文本节点中。写入时必须 strip，否则 doc.patch() 会产生乱码。
-  const cleanReplaceText = stripNonTextPlaceholders(replaceText)
-
-  // fullText（来自文档树）可能含 OMML 边界残留的零宽字符，而 normalizedSearch
-  // 已被剥离。直接剥离 fullText 会破坏偏移量与 segments 的对应关系。
-  // 解决：构建"剥离零宽后的 fullText"及其到原始 fullText 的索引映射，
-  // 在干净版本上匹配，再把匹配区间换算回原始坐标。
-  let cleanFullText = ''
-  const indexMap: number[] = [] // indexMap[i] = cleanFullText[i] 在原始 fullText 中的位置
-  for (let i = 0; i < fullText.length; i++) {
-    const ch = fullText[i]
+  // fullText 可能含 OMML 边界残留的零宽字符，而搜索串已被剥离。
+  // 构建"剥离零宽后的文本"及其到原始文本的索引映射，在干净版本上
+  // 匹配，再把匹配区间换算回原始坐标。
+  let cleanText = ''
+  const indexMap: number[] = []
+  for (let i = 0; i < originalText.length; i++) {
+    const ch = originalText[i]
     if (/[\u200B-\u200D\uFEFF]/.test(ch)) continue
-    indexMap[cleanFullText.length] = i
-    cleanFullText += ch
+    indexMap[cleanText.length] = i
+    cleanText += ch
   }
-  // 末尾哨兵：cleanFullText.length 位置映射到 fullText.length
-  indexMap[cleanFullText.length] = fullText.length
+  // 末尾哨兵：cleanText.length 位置映射到 originalText.length
+  indexMap[cleanText.length] = originalText.length
 
-  // 哨兵 → \s* 桥接占位符原来的位置；其余空白折叠为 \s+
-  const pattern = escapeRegExp(bridged)
-    .replace(/\u0000/g, '\\s*')
-    .replace(/[\s\u200B-\u200D\uFEFF]+/g, '\\s+')
-  const regex = new RegExp(pattern)
-  const match = cleanFullText.match(regex)
+  return { node: paraNode, needsRunLevel, segments, originalText, cleanText, indexMap }
+}
 
-  if (!match || match.index === undefined) return false
-
-  // 把 cleanFullText 坐标换算回原始 fullText 坐标
-  // matchStart 取匹配起点的原始位置；matchEnd 取匹配终点对应的原始位置
-  // （由于末尾哨兵，indexMap[matchEnd in clean] 会指向原始 fullText 中
-  //   匹配段最后一个字符的下一个位置，可能跨越若干被剥离的零宽字符——
-  //   这正是我们想要的，回写时连零宽脏字符一并清除）
-  const matchStart = indexMap[match.index]
-  const cleanEnd = match.index + match[0].length
-  const matchEnd = indexMap[cleanEnd]
-
-  // 找出被匹配覆盖的文本片段
-  const affected = segments.filter(s => s.start < matchEnd && s.end > matchStart)
-  if (affected.length === 0) return false
-
-  if (affected.length === 1) {
-    // 匹配在单个文本节点内——直接做字符串替换
-    const seg = affected[0]
-    const localStart = matchStart - seg.start
-    const localEnd = matchEnd - seg.start
-    seg.node.props.text = seg.text.slice(0, localStart) + cleanReplaceText + seg.text.slice(localEnd)
-    return true
-  }
-
-  // 匹配跨越多个文本节点：按各节点被消耗的字符数比例分配替换文本
-  const consumedLengths = affected.map(seg => {
-    return Math.min(seg.end, matchEnd) - Math.max(seg.start, matchStart)
-  })
-
-  const totalConsumed = consumedLengths.reduce((a, b) => a + b, 0)
-  if (totalConsumed === 0) return false
-
-  let replaceCursor = 0
-
-  for (let i = 0; i < affected.length; i++) {
-    const seg = affected[i]
-    const isLast = i === affected.length - 1
-
-    const localMatchStart = Math.max(0, matchStart - seg.start)
-    const localMatchEnd = Math.min(seg.text.length, matchEnd - seg.start)
-
-    let replacementPortion: string
-    if (isLast) {
-      // 最后一个片段取剩余全部
-      replacementPortion = cleanReplaceText.slice(replaceCursor)
-    } else {
-      // 按比例截取
-      const portionLength = Math.round((cleanReplaceText.length * consumedLengths[i]) / totalConsumed)
-      replacementPortion = cleanReplaceText.slice(replaceCursor, replaceCursor + portionLength)
-      replaceCursor += portionLength
+/**
+ * 枚举一个段落快照中搜索串的全部匹配位置（originalText 坐标系）。
+ * 匹配始终基于快照的原始文本，不受先前替换影响。
+ */
+function enumerateParagraphMatches(snapshot: ParaSnapshot, pattern: string): { start: number; end: number }[] {
+  const regex = new RegExp(pattern, 'g')
+  const matches: { start: number; end: number }[] = []
+  let m: RegExpExecArray | null
+  while ((m = regex.exec(snapshot.cleanText)) !== null) {
+    if (m[0].length === 0) {
+      regex.lastIndex += 1
+      continue
     }
-
-    seg.node.props.text =
-      seg.text.slice(0, localMatchStart) + replacementPortion + seg.text.slice(localMatchEnd)
+    // indexMap 末尾哨兵保证 end 可指向 originalText.length（含被剥离的零宽脏字符，
+    // 回写时连零宽脏字符一并清除）
+    matches.push({
+      start: snapshot.indexMap[m.index],
+      end: snapshot.indexMap[m.index + m[0].length]
+    })
   }
+  return matches
+}
 
-  return true
+/**
+ * 在普通段落（整段 props.text）上按 start 降序应用多处编辑。
+ */
+function applyNormalEdits(snapshot: ParaSnapshot, edits: { start: number; end: number; replaceText: string }[]): void {
+  let text = snapshot.originalText
+  for (const edit of edits) {
+    text = text.slice(0, edit.start) + edit.replaceText + text.slice(edit.end)
+  }
+  snapshot.node.props.text = text
+}
+
+/**
+ * 在 run 级段落上按 start 升序应用多处编辑，保留每个 run 的格式。
+ *
+ * 核心原理与单处替换版一致：仅修改 w:t 文本节点的 props.text，
+ * 不修改 paragraph.props.text，避免 patch 引擎按字符数重分配文本
+ * 导致的格式边界错位。替换文本整体写入匹配起点所在的片段
+ * （该 run 承载错误首字符的格式），其余受影响片段仅删除被消耗的字符。
+ */
+function applyRunLevelEdits(snapshot: ParaSnapshot, edits: { start: number; end: number; replaceText: string }[]): void {
+  if (snapshot.segments.length === 0) return
+  const ordered = [...edits].sort((a, b) => a.start - b.start)
+  for (const seg of snapshot.segments) {
+    let out = ''
+    let cursor = seg.start
+    for (const edit of ordered) {
+      if (edit.end <= seg.start || edit.start >= seg.end) continue
+      const overlapStart = Math.max(edit.start, seg.start)
+      const overlapEnd = Math.min(edit.end, seg.end)
+      out += seg.text.slice(cursor - seg.start, overlapStart - seg.start)
+      if (edit.start >= seg.start && edit.start < seg.end) {
+        out += edit.replaceText
+      }
+      cursor = overlapEnd
+    }
+    out += seg.text.slice(cursor - seg.start)
+    if (out !== seg.text) {
+      seg.node.props.text = out
+    }
+  }
 }
 
 // ====== 树遍历辅助函数 ======
@@ -319,41 +302,89 @@ export async function replaceTextInDocx(
   // 一次取树，批量应用所有替换，最后一次 patch
   const tree = doc.toComponentTree()
 
-  // 收集所有文档部件中的段落（body / header / footer 等）
+  // 收集所有文档部件中的段落（body / header / footer 等），并建立替换前快照
   const allParagraphs: any[] = []
   for (const part of tree.children) {
     collectAllParagraphs(part, allParagraphs)
   }
+  const snapshots = allParagraphs.map(buildParaSnapshot)
+
+  // ====== 定位阶段：在原始快照上按出现次序分配 ======
+  // 校正列表顺序与文档顺序一致，因此同一原文的第 k 条替换分配给文档中
+  // 第 k 次出现（与预览高亮的分配规则相同）。此前"逐条找第一个能匹配的
+  // 段落"的做法在重复文本上会全部命中第一处，错改后续段落。
+  const occurrenceCursor = new Map<string, number>()
+
+  interface LocatedEdit {
+    paraIdx: number
+    start: number
+    end: number
+    replaceText: string
+  }
+  const locatedEdits: LocatedEdit[] = []
 
   for (const replacement of sanitizedReplacements) {
-    let applied = false
+    const key = stripZeroWidth(replacement.original).trim()
+    const pattern = buildSearchPattern(replacement.original)
+    if (!pattern) {
+      unmatched.push(replacement)
+      continue
+    }
+    const occurrence = occurrenceCursor.get(key) || 0
+    occurrenceCursor.set(key, occurrence + 1)
 
-    for (const paraNode of allParagraphs) {
-      if (needsRunLevelReplacement(paraNode)) {
-        // 含上下角标或脚注/尾注：run 级别替换，保留格式
-        applied = replaceInParagraphRuns(paraNode, replacement.original, replacement.suggested)
-      } else {
-        // 普通段落：整段文本替换（兼容 tab / break）
-        const currentText = paraNode.props.text || ''
-        const result = replaceFirstWhitespaceInsensitive(
-          currentText,
-          replacement.original,
-          replacement.suggested
-        )
-        if (result.count > 0) {
-          paraNode.props.text = result.text
-          applied = true
+    let target: { paraIdx: number; start: number; end: number } | null = null
+    let seen = 0
+    for (let paraIdx = 0; paraIdx < snapshots.length && !target; paraIdx++) {
+      for (const range of enumerateParagraphMatches(snapshots[paraIdx], pattern)) {
+        if (seen === occurrence) {
+          target = { paraIdx, start: range.start, end: range.end }
+          break
         }
-      }
-
-      if (applied) {
-        appliedCount += 1
-        break
+        seen += 1
       }
     }
 
-    if (!applied) {
+    if (!target) {
       unmatched.push(replacement)
+      continue
+    }
+
+    // replaceText 中不能包含脚注/公式占位符——它们是独立的 XML 元素，
+    // 不在 w:t 文本节点中。写入前必须 strip，否则 doc.patch() 会产生乱码。
+    const edit: LocatedEdit = {
+      paraIdx: target.paraIdx,
+      start: target.start,
+      end: target.end,
+      replaceText: stripNonTextPlaceholders(replacement.suggested)
+    }
+
+    // 两条不同原文的匹配区间在段内重叠时放弃后者（保留先定位到的替换）
+    const overlaps = locatedEdits.some(
+      e => e.paraIdx === edit.paraIdx && e.start < edit.end && edit.start < e.end
+    )
+    if (overlaps) {
+      unmatched.push(replacement)
+      continue
+    }
+
+    locatedEdits.push(edit)
+    appliedCount += 1
+  }
+
+  // ====== 应用阶段：按段落分组，段内按 start 排序做多点替换 ======
+  const editsByPara = new Map<number, LocatedEdit[]>()
+  for (const edit of locatedEdits) {
+    const list = editsByPara.get(edit.paraIdx) || []
+    list.push(edit)
+    editsByPara.set(edit.paraIdx, list)
+  }
+  for (const [paraIdx, edits] of editsByPara) {
+    const snapshot = snapshots[paraIdx]
+    if (snapshot.needsRunLevel) {
+      applyRunLevelEdits(snapshot, edits)
+    } else {
+      applyNormalEdits(snapshot, edits)
     }
   }
 

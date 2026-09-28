@@ -98,7 +98,11 @@
       "reviewFiltered": "Review filtered {count} invalid suggestions",
       "undoSuccess": "Change reverted",
       "undoAllSuccess": "All changes reverted",
-      "noAppliedChanges": "No applied changes to undo"
+      "noAppliedChanges": "No applied changes to undo",
+      "ignored": "Suggestion ignored, you can unignore it anytime",
+      "unignored": "Suggestion restored",
+      "editSaved": "Suggestion updated",
+      "editEmpty": "Suggestion text cannot be empty"
     },
     "formatClone": {
       "title": "Format Clone",
@@ -124,7 +128,14 @@
       "generateFailed": "Failed to generate format parameters",
       "readFileFailed": "Failed to read file",
       "emptyDesc": "Please enter a format description"
-    }
+    },
+    "ignore": "Ignore",
+    "unignore": "Unignore",
+    "rejectedTag": "Ignored",
+    "editedTag": "Edited",
+    "editSuggested": "Edit suggested text",
+    "saveEdit": "Save",
+    "cancelEdit": "Cancel"
   },
   "apiSettings": {
     "tabAPI": "API Settings",

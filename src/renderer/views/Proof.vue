@@ -7,13 +7,14 @@
           :key="index"
           :name="index"
           :id="`error-item-${index}`"
-          :class="`correction-item type-${(item.type || '').toLowerCase()}`"
+          :class="[`correction-item type-${(item.type || '').toLowerCase()}`, { 'correction-item-rejected': item.rejected }]"
         >
           <template #title>
             <div class="correction-header" @click="scrollPreviewToCorrection(index)">
               <span class="correction-type" :class="`type-${(item.type || '').toLowerCase()}`">
                 {{ formatCorrectionType(item.type) }}
               </span>
+              <span v-if="item.rejected" class="correction-rejected-tag">{{ t('proof.rejectedTag') }}</span>
               <span class="correction-count">{{ index + 1 }}/{{ proofreadingResults.length }}</span>
             </div>
           </template>
@@ -23,19 +24,71 @@
               <strong>{{ t('proof.original') }}</strong> {{ item.original || t('proof.noData') }}
             </div>
             <div class="suggested">
-              <strong>{{ t('proof.suggested') }}</strong> {{ item.suggested || t('proof.noData') }}
+              <strong>{{ t('proof.suggested') }}</strong>
+              <el-tag v-if="item.edited" size="small" type="info" class="edited-tag">{{ t('proof.editedTag') }}</el-tag>
+              <template v-if="editingIndex === index">
+                <el-input
+                  v-model="editingText"
+                  type="textarea"
+                  :autosize="{ minRows: 2, maxRows: 8 }"
+                  class="suggested-editor"
+                  @click.stop
+                />
+                <div class="edit-actions">
+                  <el-button size="small" type="primary" @click.stop="saveEdit(index)">
+                    {{ t('proof.saveEdit') }}
+                  </el-button>
+                  <el-button size="small" @click.stop="cancelEdit">
+                    {{ t('proof.cancelEdit') }}
+                  </el-button>
+                </div>
+              </template>
+              <template v-else>
+                <span class="suggested-text">{{ item.suggested || t('proof.noData') }}</span>
+                <el-icon
+                  v-if="!item.applied"
+                  class="edit-icon"
+                  :title="t('proof.editSuggested')"
+                  @click.stop="startEdit(index)"
+                >
+                  <EditPen />
+                </el-icon>
+              </template>
             </div>
             <div class="reason">
               <strong>{{ t('proof.reason') }}</strong> {{ item.reason || t('proof.noData') }}
             </div>
             <div class="actions">
-              <el-button v-if="!item.applied" type="primary" size="small" @click.stop="applyCorrection(index)">
+              <el-button
+                v-if="!item.applied && !item.rejected"
+                type="primary"
+                size="small"
+                @click.stop="applyCorrection(index)"
+              >
                 {{ t('proof.applyChanges') }}
               </el-button>
               <el-button v-if="item.applied" type="warning" size="small" @click.stop="undoCorrection(index)">
                 {{ t('proof.undo') }}
               </el-button>
-              <el-popover placement="bottom-start" width="500px" trigger="click" popper-class="reference-popover">
+              <el-button
+                v-if="!item.applied && !item.rejected"
+                type="info"
+                size="small"
+                plain
+                @click.stop="ignoreCorrection(index)"
+              >
+                {{ t('proof.ignore') }}
+              </el-button>
+              <el-button v-if="item.rejected" type="info" size="small" @click.stop="unignoreCorrection(index)">
+                {{ t('proof.unignore') }}
+              </el-button>
+              <el-popover
+                v-if="item.References && item.References.length > 0"
+                placement="bottom-start"
+                width="500px"
+                trigger="click"
+                popper-class="reference-popover"
+              >
                 <template #reference>
                   <el-button type="primary" size="small" style="margin-left: 8px" @click.stop>
                     {{ t('proof.viewReference') }}
@@ -68,10 +121,19 @@
 import { ref, onMounted, onUnmounted, watch, nextTick, computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
-import { ElButton, ElEmpty, ElCollapse, ElCollapseItem, ElMessage, ElPopover } from 'element-plus'
+import { ElButton, ElEmpty, ElCollapse, ElCollapseItem, ElInput, ElMessage, ElPopover, ElTag } from 'element-plus'
+import { EditPen } from '@element-plus/icons-vue'
 
 import { scrollTo } from 'vue-scrollto'
 import { fileInfoStore } from '../stores/store'
+import {
+  clearHighlights,
+  getDomPositionFromIndex,
+  locateCorrectionsInPreview,
+  replaceCorrectionInPreview,
+  undoCorrectionsInPreview
+} from '../utils/correctionMatching'
+import { forceVisibleSection } from '../utils/previewPerf'
 
 const previewContainer = inject('previewContainer')
 const fileStore = fileInfoStore()
@@ -82,6 +144,57 @@ const proofreadingResults = computed({
 })
 const activeNames = ref([])
 let previewFocusTimer = null
+
+// ---- 建议文本编辑 ----
+const editingIndex = ref(-1)
+const editingText = ref('')
+
+const startEdit = index => {
+  const item = proofreadingResults.value[index]
+  if (!item || item.applied) return
+  editingIndex.value = index
+  editingText.value = item.suggested || ''
+}
+
+const cancelEdit = () => {
+  editingIndex.value = -1
+  editingText.value = ''
+}
+
+const saveEdit = index => {
+  const text = editingText.value
+  if (!text.trim()) {
+    ElMessage.warning(t('proof.messages.editEmpty'))
+    return
+  }
+  const item = proofreadingResults.value[index]
+  if (!item) return
+  if (text === item.suggested) {
+    cancelEdit()
+    return
+  }
+  const newResults = [...proofreadingResults.value]
+  newResults[index] = { ...newResults[index], suggested: text, edited: true }
+  proofreadingResults.value = newResults
+  cancelEdit()
+  ElMessage.success(t('proof.messages.editSaved'))
+}
+
+// ---- 忽略 / 恢复 ----
+const ignoreCorrection = index => {
+  const newResults = [...proofreadingResults.value]
+  newResults[index] = { ...newResults[index], rejected: true, applied: false }
+  proofreadingResults.value = newResults
+  if (editingIndex.value === index) cancelEdit()
+  ElMessage.info(t('proof.messages.ignored'))
+}
+
+const unignoreCorrection = index => {
+  const newResults = [...proofreadingResults.value]
+  newResults[index] = { ...newResults[index], rejected: false }
+  proofreadingResults.value = newResults
+  ElMessage.success(t('proof.messages.unignored'))
+}
 
 const formatCorrectionType = type => {
   const typeMap = {
@@ -101,107 +214,8 @@ const normalizeCorrectionType = type => {
   return (type || '').toString().trim().toLowerCase()
 }
 
-const createWhitespaceInsensitiveMatcher = (searchText, flags = 'g') => {
-  const escapedText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = escapedText.replace(/\s+/g, '\\s+')
-  return new RegExp(pattern, flags)
-}
-
-const clearHighlights = container => {
-  const existingHighlights = container.querySelectorAll('.highlight-correction')
-  existingHighlights.forEach(el => {
-    const parent = el.parentNode
-    if (!parent) return
-    while (el.firstChild) {
-      parent.insertBefore(el.firstChild, el)
-    }
-    parent.removeChild(el)
-    parent.normalize()
-  })
-}
-
-const buildTextNodeMap = container => {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  const segments = []
-  let fullText = ''
-  let currentOffset = 0
-  let node
-  while ((node = walker.nextNode())) {
-    const text = node.textContent || ''
-    if (!text) continue
-    segments.push({
-      node,
-      start: currentOffset,
-      end: currentOffset + text.length
-    })
-    fullText += text
-    currentOffset += text.length
-  }
-  return { fullText, segments }
-}
-
-const getDomPositionFromIndex = (segments, targetIndex, preferEnd = false) => {
-  if (segments.length === 0) return null
-  if (targetIndex <= 0) {
-    return { node: segments[0].node, offset: 0 }
-  }
-  const lastSegment = segments[segments.length - 1]
-  if (targetIndex >= lastSegment.end) {
-    return {
-      node: lastSegment.node,
-      offset: lastSegment.node.textContent.length
-    }
-  }
-  for (const segment of segments) {
-    if (preferEnd) {
-      if (targetIndex >= segment.start && targetIndex <= segment.end) {
-        return {
-          node: segment.node,
-          offset: Math.min(targetIndex - segment.start, segment.node.textContent.length)
-        }
-      }
-    } else if (targetIndex >= segment.start && targetIndex < segment.end) {
-      return {
-        node: segment.node,
-        offset: targetIndex - segment.start
-      }
-    }
-  }
-  return null
-}
-
-const rangesOverlap = (left, right) => !(left.end <= right.start || left.start >= right.end)
-
-const locateCorrectionsInPreview = (container, corrections) => {
-  const { fullText, segments } = buildTextNodeMap(container)
-  const occupiedRanges = []
-  const matches = []
-  corrections.forEach(({ item, index }) => {
-    const originalText = item.original?.trim()
-    if (!originalText) return
-    const regex = createWhitespaceInsensitiveMatcher(originalText)
-    let match
-    while ((match = regex.exec(fullText))) {
-      const start = match.index
-      const end = start + match[0].length
-      const range = { start, end }
-      if (!occupiedRanges.some(existing => rangesOverlap(existing, range))) {
-        occupiedRanges.push(range)
-        matches.push({
-          index,
-          item,
-          start,
-          end
-        })
-        break
-      }
-      if (match[0].length === 0) {
-        regex.lastIndex += 1
-      }
-    }
-  })
-  return { matches, segments }
-}
+// 文本定位/高亮/替换的通用逻辑统一在 utils/correctionMatching.js 维护，
+// 与右侧预览（DocPreview）共用同一套匹配口径（含重复文本按出现次序分配的约定）
 
 const scrollToCorrectionItem = index => {
   if (index === -1) return
@@ -262,15 +276,23 @@ const scrollPreviewToCorrection = index => {
   const correctionId = correction.id || `correction-${index}`
   const highlightEl = findHighlightElement(correctionId)
   if (!highlightEl) return false
-  const containerRect = container.getBoundingClientRect()
-  const highlightRect = highlightEl.getBoundingClientRect()
-  const offsetTop = highlightRect.top - containerRect.top + container.scrollTop
-  const targetScrollTop = Math.max(offsetTop - container.clientHeight * 0.35, 0)
-  container.scrollTo({
-    top: targetScrollTop,
-    behavior: 'smooth'
-  })
-  focusPreviewHighlight(highlightEl)
+  // content-visibility:auto 的未渲染页面没有布局盒，量取坐标前临时强制可见
+  const restoreVisibility = forceVisibleSection(highlightEl)
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect()
+      const highlightRect = highlightEl.getBoundingClientRect()
+      const offsetTop = highlightRect.top - containerRect.top + container.scrollTop
+      const targetScrollTop = Math.max(offsetTop - container.clientHeight * 0.35, 0)
+      container.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      })
+      focusPreviewHighlight(highlightEl)
+      // 平滑滚动结束后恢复按需渲染
+      setTimeout(restoreVisibility, 700)
+    })
+  )
   return true
 }
 
@@ -298,7 +320,7 @@ const highlightCorrections = () => {
   clearHighlights(container)
   const pendingCorrections = proofreadingResults.value
     .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !item.applied)
+    .filter(({ item }) => !item.applied && !item.rejected)
   if (pendingCorrections.length === 0) return
   const { matches, segments } = locateCorrectionsInPreview(container, pendingCorrections)
   matches
@@ -309,30 +331,18 @@ const highlightCorrections = () => {
     })
 }
 
-const replaceCorrectionInPreview = (container, correction) => {
-  clearHighlights(container)
-  const { matches, segments } = locateCorrectionsInPreview(container, [{ item: correction, index: 0 }])
-  const match = matches[0]
-  if (!match) return false
-  const startPos = getDomPositionFromIndex(segments, match.start, false)
-  const endPos = getDomPositionFromIndex(segments, match.end, true)
-  if (!startPos || !endPos) return false
-  const range = document.createRange()
-  range.setStart(startPos.node, startPos.offset)
-  range.setEnd(endPos.node, endPos.offset)
-  range.deleteContents()
-  range.insertNode(document.createTextNode(correction.suggested || ''))
-  container.normalize()
-  return true
-}
-
 const applyCorrection = index => {
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], applied: true }
   proofreadingResults.value = newResults
   const container = previewContainer.value
   if (!container) return
-  const updated = replaceCorrectionInPreview(container, newResults[index])
+  // 定位时把"全部未处理项 + 本条"一并纳入分配：重复文本按出现次序
+  // 命中本条对应的位置（与高亮分配一致），而不是总替换第一处
+  const contextList = newResults
+    .map((item, i) => ({ item, index: i }))
+    .filter(({ item, index: i }) => (!item.applied && !item.rejected) || i === index)
+  const updated = replaceCorrectionInPreview(container, newResults[index], contextList)
   highlightCorrections()
   if (updated) {
     ElMessage.success(t('proof.messages.applied'))
@@ -342,103 +352,38 @@ const applyCorrection = index => {
 }
 
 const undoCorrection = index => {
+  const target = proofreadingResults.value[index]
+  if (!target) return
+  // 原位撤销：把这条建议的文本替换回原文，避免整篇重渲染
+  const container = previewContainer.value
+  const appliedItems = proofreadingResults.value.filter(item => item.applied)
+  const undone =
+    container && appliedItems.length > 0 ? undoCorrectionsInPreview(container, appliedItems, [target]) : 0
+  fileStore.requestSkipResultRerender()
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], applied: false }
   proofreadingResults.value = newResults
-  fileStore.triggerRerender()
+  if (undone === 1) {
+    highlightCorrections()
+  } else {
+    // 原位撤销失败（预览中找不到建议文本等），退回整篇重渲染重放已应用项
+    fileStore.triggerRerender()
+  }
   ElMessage.success(t('proof.messages.undoSuccess'))
 }
 
-const availableCategories = computed(() => {
-  const typeMap = {
-    Typo: t('proof.correctionTypes.Typo'),
-    Punctuation: t('proof.correctionTypes.Punctuation'),
-    Grammar: t('proof.correctionTypes.Grammar'),
-    Consistency: t('proof.correctionTypes.Consistency'),
-    wordError: t('proof.correctionTypes.wordError'),
-    ComprehensiveError: t('proof.correctionTypes.ComprehensiveError'),
-    polish: t('proof.correctionTypes.polish'),
-    reduceAI: t('proof.correctionTypes.reduceAI')
-  }
-  const types = new Set()
-  proofreadingResults.value.forEach(item => {
-    if (!item.applied && item.type) {
-      types.add(item.type)
-    }
-  })
-  return Array.from(types).map(type => ({
-    value: type,
-    label: typeMap[type] || type
-  }))
-})
-
-const getCategoryCount = type => {
-  const count = proofreadingResults.value.filter(item => !item.applied && item.type === type).length
-  return t('proof.messages.countItems', { count })
-}
-
-const applyByCategory = type => {
-  const applicableResults = proofreadingResults.value.filter(item => !item.applied && item.type === type)
-  if (applicableResults.length === 0) {
-    ElMessage.warning(t('proof.messages.noPendingInCategory'))
-    return
-  }
-  const newResults = proofreadingResults.value.map(item => {
-    if (!item.applied && item.type === type) {
-      return { ...item, applied: true }
-    }
-    return item
-  })
-  proofreadingResults.value = newResults
-  const container = previewContainer.value
-  if (!container) return
-  let replacedCount = 0
-  applicableResults.forEach(item => {
-    if (replaceCorrectionInPreview(container, { ...item, applied: true })) {
-      replacedCount += 1
-    }
-  })
-  highlightCorrections()
-  const typeLabel = formatCorrectionType(type)
-  if (replacedCount === applicableResults.length) {
-    ElMessage.success(t('proof.messages.appliedAllType', { typeLabel }))
-  } else {
-    ElMessage.warning(
-      t('proof.messages.appliedPartialType', { replaced: replacedCount, total: applicableResults.length, typeLabel })
-    )
-  }
-}
-
-const applyALLCorrection = () => {
-  const applicableResults = proofreadingResults.value.filter(item => !item.applied)
-  if (applicableResults.length === 0) {
-    ElMessage.warning(t('proof.messages.noPendingChanges'))
-    return
-  }
-  const newResults = proofreadingResults.value.map(item => ({ ...item, applied: true }))
-  proofreadingResults.value = newResults
-  const container = previewContainer.value
-  if (!container) return
-  clearHighlights(container)
-  let replacedCount = 0
-  applicableResults.forEach(item => {
-    if (replaceCorrectionInPreview(container, { ...item, applied: true })) {
-      replacedCount += 1
-    }
-  })
-  if (replacedCount === applicableResults.length) {
-    ElMessage.success(t('proof.messages.appliedAll'))
-  } else {
-    ElMessage.warning(t('proof.messages.appliedPartial', { replaced: replacedCount, total: applicableResults.length }))
-  }
-}
+// 批量应用/按类型应用的入口在右侧预览工具栏（DocPreview.vue）中，
+// 本列表只负责单条的应用、撤销、忽略与编辑。
 
 watch(
   () => fileStore.results,
-  newResults => {
-    if (newResults.length > 0) {
+  (newVal, oldVal) => {
+    if (newVal.length > 0) {
       nextTick(() => highlightCorrections())
-      activeNames.value = [0]
+      // 仅在结果从无到有时自动展开第一项，避免应用/编辑等操作打乱当前展开状态
+      if (!oldVal || oldVal.length === 0) {
+        activeNames.value = [0]
+      }
     }
   }
 )
@@ -620,6 +565,23 @@ html.dark .actions {
   border-top-color: #2c2e30;
 }
 
+html.dark .correction-item-rejected {
+  opacity: 0.5;
+}
+
+html.dark .correction-rejected-tag {
+  color: #8a929e;
+  border-color: #4c4d4f;
+}
+
+html.dark .edit-icon {
+  color: #6a6a6a;
+}
+
+html.dark .edit-icon:hover {
+  color: #8ec5ff;
+}
+
 html.dark .reference-item {
   background: #1d1e1f;
   border-left-color: #409eff;
@@ -781,6 +743,56 @@ html.dark .el-collapse-item__header.is-active {
   border: none;
   background-color: #ffffff;
   transition: background 0.2s ease;
+}
+
+/* 已忽略的建议：整体弱化显示 */
+.correction-item-rejected {
+  opacity: 0.55;
+}
+
+.correction-item-rejected .correction-type {
+  filter: saturate(0.2);
+}
+
+.correction-rejected-tag {
+  font-size: 11px;
+  color: #8a929e;
+  border: 1px solid #c0c4cc;
+  border-radius: 4px;
+  padding: 0 6px;
+  line-height: 18px;
+}
+
+.suggested-text {
+  word-break: break-word;
+}
+
+.edit-icon {
+  margin-left: 8px;
+  cursor: pointer;
+  color: #9aa4b1;
+  vertical-align: -2px;
+  transition: color 0.15s ease;
+}
+
+.edit-icon:hover {
+  color: #409eff;
+}
+
+.suggested-editor {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.edit-actions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.edited-tag {
+  margin-left: 6px;
 }
 
 .correction-item:hover {
