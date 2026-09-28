@@ -15,7 +15,11 @@ import {
   resetPromptSettings,
   reviewCorrections,
   getCurrentBackgroundInstruction,
-  setLocale
+  setLocale,
+  createStreamSink,
+  ProofreadStreamSink,
+  createProofreadCancelToken,
+  ProofreadCancelToken
 } from './proof'
 import { deleteDocumentByName, listFilenamesInRepository } from './lancedb'
 import { Mode } from '@google/genai'
@@ -39,7 +43,7 @@ import { processDocument, getPDFDocumentChunks } from './pdfUtils'
 import { list } from 'changelog.config'
 import { error } from 'console'
 import { eventNames, env } from 'process'
-import { ProofreadProgressPayload } from '../shared/proofreadProgress'
+import { ProofreadProgressPayload, ProofreadStreamPayload, ProofreadMode } from '../shared/proofreadProgress'
 // const { platform, arch, env } = process;
 export interface apiSettings {
   apiURL: string
@@ -71,6 +75,24 @@ let proxy_settings: ProxySettings = {
 }
 
 const PROOFREAD_PROGRESS_CHANNEL = 'proofread-progress'
+const PROOFREAD_STREAM_CHANNEL = 'proofread-stream'
+const PROOFREAD_CANCEL_CHANNEL = 'proofread-cancel'
+
+// 活跃校对任务的取消令牌：runId → token。
+// 渲染端发起校对时生成 runId 一并传入，取消时按 runId 精确中止对应任务
+const activeProofreadTokens = new Map<string, ProofreadCancelToken>()
+
+// 校对粒度可选值与解析规则：
+// polish/reduceAI 固定整篇处理；其余类型默认 wordError=按句、ComprehensiveError=按段，
+// 前端可通过 proofMode 参数覆盖（此前该能力在共享层定义了却无任何入口）
+const PROOF_MODES: ProofreadMode[] = ['full', 'section', 'sentence']
+const resolveProofMode = (model: string, requested?: string): ProofreadMode => {
+  if (model === 'polish' || model === 'reduceAI') return 'full'
+  if (requested && PROOF_MODES.includes(requested as ProofreadMode)) {
+    return requested as ProofreadMode
+  }
+  return model === 'ComprehensiveError' ? 'section' : 'sentence'
+}
 
 // 全局embedding_api变量已移除，由Pinia store管理
 export const registerIpcHandlers = () => {
@@ -249,12 +271,24 @@ export const registerIpcHandlers = () => {
       embeddingConfig?: apiSettings,
       setTimeLimit?: number,
       parallelSet: number = 30,
-      reviewModelId?: number | null
+      reviewModelId?: number | null,
+      runId?: string,
+      proofMode?: string
     ) => {
+      // 流式输出：LLM 增量文本与分段完成事件经独立通道推送渲染端。
+      // 声明在 try 外，finally 中需要访问并刷出缓冲
+      let streamSink: ProofreadStreamSink | null = null
+      // 取消令牌：注册进全局表供 cancelProofread 查找，结束时移除
+      const cancelToken = createProofreadCancelToken()
+      if (runId) activeProofreadTokens.set(runId, cancelToken)
       try {
         const sendProgress = (payload: ProofreadProgressPayload) => {
           event.sender.send(PROOFREAD_PROGRESS_CHANNEL, payload)
         }
+        const sendStream = (payload: ProofreadStreamPayload) => {
+          event.sender.send(PROOFREAD_STREAM_CHANNEL, payload)
+        }
+        streamSink = createStreamSink(sendStream)
         // 三种校对模式：mode: 'section' | 'sentence' | 'full',
         console.log(
           '-----------------------------------------------processing docx file-------------------------------------------------------'
@@ -288,7 +322,7 @@ export const registerIpcHandlers = () => {
           console.log('will process by the model:', api_info.apiKey, api_info.apiURL, api_info.modelName)
           let { proofResult, token_usage } = await proofreadDocument(
             filePath,
-            'sentence',
+            resolveProofMode(Model, proofMode),
             api_info.apiKey,
             api_info.modelName,
             api_info.apiURL,
@@ -297,7 +331,9 @@ export const registerIpcHandlers = () => {
             parallelSet,
             setTimeLimit,
             sendProgress,
-            api_info.provider
+            api_info.provider,
+            streamSink,
+            cancelToken
           )
 
           // 自动审核校对结果
@@ -337,7 +373,9 @@ export const registerIpcHandlers = () => {
                   message: '正在审核校对结果'
                 })
               },
-              reviewApiInfo.provider
+              reviewApiInfo.provider,
+              streamSink,
+              cancelToken
             )
             proofResult = reviewedResult
             token_usage += reviewTokens
@@ -360,7 +398,7 @@ export const registerIpcHandlers = () => {
           console.log('will process by the model:', api_info.apiKey, api_info.apiURL, api_info.modelName)
           let { proofResult, token_usage } = await proofreadDocument(
             filePath,
-            'section',
+            resolveProofMode(Model, proofMode),
             api_info.apiKey,
             api_info.modelName,
             api_info.apiURL,
@@ -369,7 +407,9 @@ export const registerIpcHandlers = () => {
             parallelSet,
             setTimeLimit,
             sendProgress,
-            api_info.provider
+            api_info.provider,
+            streamSink,
+            cancelToken
           )
 
           // 自动审核校对结果
@@ -409,7 +449,9 @@ export const registerIpcHandlers = () => {
                   message: '正在审核校对结果'
                 })
               },
-              reviewApiInfo2.provider
+              reviewApiInfo2.provider,
+              streamSink,
+              cancelToken
             )
             proofResult = reviewedResult
             token_usage += reviewTokens
@@ -441,7 +483,9 @@ export const registerIpcHandlers = () => {
             parallelSet,
             setTimeLimit,
             sendProgress,
-            api_info.provider
+            api_info.provider,
+            streamSink,
+            cancelToken
           )
 
           // 自动审核校对结果
@@ -481,7 +525,9 @@ export const registerIpcHandlers = () => {
                   message: '正在审核校对结果'
                 })
               },
-              reviewApiInfo3.provider
+              reviewApiInfo3.provider,
+              streamSink,
+              cancelToken
             )
             proofResult = reviewedResult
             token_usage += reviewTokens
@@ -513,7 +559,9 @@ export const registerIpcHandlers = () => {
             parallelSet,
             setTimeLimit,
             sendProgress,
-            api_info.provider
+            api_info.provider,
+            streamSink,
+            cancelToken
           )
           try {
             const result = {
@@ -531,13 +579,42 @@ export const registerIpcHandlers = () => {
         }
       } catch (error) {
         console.error('处理文档校对请求时出错:', error)
+        // 用户主动取消：不是错误，返回 cancelled 标记让前端走取消流程
+        if (cancelToken.cancelled) {
+          return {
+            proofResult: null,
+            token_usage: 0,
+            cancelled: true
+          }
+        }
         return {
           proofResult: null,
           token_usage: 0
         }
+      } finally {
+        activeProofreadTokens.delete(runId || '')
+        // 刷出流式缓冲区中尚未发送的增量文本
+        streamSink?.flush()
       }
     }
   )
+
+  // 取消校对：中止 runId 对应任务的在途请求并停止派发后续任务；
+  // 未指定 runId 时取消所有活跃任务
+  ipcMain.handle('cancelProofread', (_event, runId?: string) => {
+    if (runId) {
+      const token = activeProofreadTokens.get(runId)
+      if (token) {
+        token.cancel()
+        console.log('校对任务已请求取消:', runId)
+      } else {
+        console.log('取消校对：未找到活跃任务（可能已结束）:', runId)
+      }
+    } else {
+      activeProofreadTokens.forEach(token => token.cancel())
+      console.log('已请求取消所有活跃校对任务')
+    }
+  })
 
   // 新增的返回值形式
   interface ResponseData<T = any> {

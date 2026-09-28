@@ -5,7 +5,7 @@
  */
 import { proofreadLargeDocument, ProofreadingCorrection } from './proof'
 import { apiSettings } from './ipcHandlers'
-import { ProofreadProgressPayload } from '../shared/proofreadProgress'
+import { ProofreadProgressPayload, ProofreadStreamPayload } from '../shared/proofreadProgress'
 import { PromptSettings } from '../shared/promptSettings'
 
 export interface proofHistory {
@@ -130,13 +130,22 @@ export default interface ElectronApi {
     repositoryNameList?: string[],
     embeddingConfig?: apiSettings,
     setTimeLimit?: number,
-    parallelSet?: number
+    parallelSet?: number,
+    reviewModelId?: number | null,
+    runId?: string,
+    proofMode?: string
   ) => Promise<{
     proofResult: ProofreadingCorrection[]
     token_usage: number
+    cancelled?: boolean
   }> // 进行了更新
+  // 取消当前校对任务（按 runId 精确取消；不传则取消全部活跃任务）
+  cancelProofread: (runId?: string) => Promise<void>
   onProofreadProgress: (callback: (payload: ProofreadProgressPayload) => void) => () => void
   offProofreadProgress: (callback: (payload: ProofreadProgressPayload) => void) => void
+  // 流式输出事件：LLM 增量文本（kind=chunk）与分段完成（kind=segment）
+  onProofreadStream: (callback: (payload: ProofreadStreamPayload) => void) => () => void
+  offProofreadStream: (callback: (payload: ProofreadStreamPayload) => void) => void
   exportCorrectedDocx: (config: any) => Promise<ExportCorrectedDocxResult>
 
   // 提示词处理接口

@@ -1,12 +1,12 @@
 import * as fs from 'fs'
 import * as mammoth from 'mammoth'
 const { loadDocx } = require('docx-edit')
-import { OpenaiGen, getModelResponse } from './chat'
+import { OpenaiGen, getModelResponse, OnChunk } from './chat'
 import path from 'path'
 import { app } from 'electron'
 import { queryDocuments, getAllDocuments } from './lancedb'
 import { error } from 'console'
-import { ProofreadProgressPayload } from '../shared/proofreadProgress'
+import { ProofreadProgressPayload, ProofreadStreamPayload, ProofreadStreamStage } from '../shared/proofreadProgress'
 import {
   buildPromptFromSettings,
   clonePromptSettings,
@@ -96,7 +96,9 @@ async function callModelAPI(
   apiKey: string,
   modelName: string,
   apiURL: string,
-  provider?: ModelProvider
+  provider?: ModelProvider,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const actualProvider = provider || ModelProvider.OPENAI_COMPATIBLE
 
@@ -108,10 +110,119 @@ async function callModelAPI(
   detectProviderURLMismatch(actualProvider, apiURL, modelName)
 
   if (actualProvider === ModelProvider.OPENAI_COMPATIBLE) {
-    return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+    return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
   }
 
-  return await getModelResponse(actualProvider, systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return await getModelResponse(actualProvider, systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+}
+
+// ====== 校对取消令牌 ======
+/**
+ * 校对任务取消支持：渲染端通过 cancelProofread IPC 触发 cancel()，
+ * 各阶段在任务边界检查 cancelled 并停止派发新任务；signal 透传给
+ * LLM 请求以中止在途 HTTP 连接，让取消立即生效而不是等请求超时。
+ */
+export class ProofreadCancelledError extends Error {
+  constructor() {
+    super('Proofreading task was cancelled')
+    this.name = 'ProofreadCancelledError'
+  }
+}
+
+export interface ProofreadCancelToken {
+  readonly cancelled: boolean
+  readonly signal: AbortSignal
+  cancel(): void
+  throwIfCancelled(): void
+}
+
+export function createProofreadCancelToken(): ProofreadCancelToken {
+  const controller = new AbortController()
+  const token: ProofreadCancelToken = {
+    get cancelled() {
+      return controller.signal.aborted
+    },
+    get signal() {
+      return controller.signal
+    },
+    cancel() {
+      controller.abort()
+    },
+    throwIfCancelled() {
+      if (token.cancelled) throw new ProofreadCancelledError()
+    }
+  }
+  return token
+}
+
+// ====== 流式输出汇聚器 ======
+/**
+ * 把各并行分段产生的 LLM 增量文本汇聚为流式事件并节流发送。
+ *
+ * 校对流程以最多 parallelSet（默认 30）个请求并行执行，若每个 token 都直发
+ * IPC，事件量会达到每秒数百条。这里按 (stage, index) 键做缓冲：距上次发送
+ * 超过 STREAM_FLUSH_INTERVAL_MS 或缓冲超过 STREAM_FLUSH_CHARS 才真正发送，
+ * 其余情况留在缓冲里，由后续 chunk 或 segment/flush 兜底刷出。
+ */
+export interface ProofreadStreamSink {
+  chunk(stage: ProofreadStreamStage, index: number, label: string, text: string): void
+  segment(stage: ProofreadStreamStage, index: number, label: string, corrections: number): void
+  flush(): void
+}
+
+const STREAM_FLUSH_INTERVAL_MS = 80
+const STREAM_FLUSH_CHARS = 240
+
+export function createStreamSink(onStream?: (payload: ProofreadStreamPayload) => void): ProofreadStreamSink | null {
+  if (!onStream) return null
+
+  const buffers = new Map<
+    string,
+    { stage: ProofreadStreamStage; index: number; label: string; text: string }
+  >()
+  const lastSentAt = new Map<string, number>()
+
+  const send = (payload: ProofreadStreamPayload) => {
+    try {
+      onStream(payload)
+    } catch (err) {
+      console.warn('[StreamSink] 流式事件发送失败:', err)
+    }
+  }
+
+  const flushKey = (key: string) => {
+    const buf = buffers.get(key)
+    if (!buf) return
+    buffers.delete(key)
+    lastSentAt.set(key, Date.now())
+    send({ kind: 'chunk', stage: buf.stage, index: buf.index, label: buf.label, text: buf.text })
+  }
+
+  return {
+    chunk(stage, index, label, text) {
+      if (!text) return
+      const key = `${stage}:${index}`
+      const buf = buffers.get(key) || { stage, index, label: label || '', text: '' }
+      if (label) buf.label = label
+      buf.text += text
+      buffers.set(key, buf)
+      const now = Date.now()
+      const last = lastSentAt.get(key) || 0
+      if (buf.text.length >= STREAM_FLUSH_CHARS || now - last >= STREAM_FLUSH_INTERVAL_MS) {
+        flushKey(key)
+      }
+    },
+    segment(stage, index, label, corrections) {
+      // 先刷出该分段尚未发送的增量文本，保证渲染端先看到文本再看到完成标记
+      flushKey(`${stage}:${index}`)
+      send({ kind: 'segment', stage, index, label: label || '', corrections })
+    },
+    flush() {
+      for (const key of Array.from(buffers.keys())) {
+        flushKey(key)
+      }
+    }
+  }
 }
 
 // ====== Locale helpers ======
@@ -229,6 +340,7 @@ export async function runWithLimits<T, R>(
   options?: {
     requestsPerMinute?: number
     onItemCompleted?: (completed: number, total: number) => void
+    shouldCancel?: () => boolean
   }
 ): Promise<R[]> {
   const results: (R | undefined)[] = new Array(items.length)
@@ -236,7 +348,7 @@ export async function runWithLimits<T, R>(
   let completedCount = 0
 
   // --- 新增逻辑: 速率限制初始化 ---
-  const { requestsPerMinute, onItemCompleted } = options || {}
+  const { requestsPerMinute, onItemCompleted, shouldCancel } = options || {}
   const hasRateLimit = typeof requestsPerMinute === 'number' && requestsPerMinute > 0
 
   // 计算两次请求之间的最小时间间隔（毫秒）
@@ -245,6 +357,9 @@ export async function runWithLimits<T, R>(
   // --- 新增逻辑结束 ---
 
   for (let i = 0; i < items.length; i++) {
+    // 任务已取消：不再派发新任务，等待在途任务结束（signal 会中止它们的请求）
+    if (shouldCancel?.()) break
+
     // --- 核心逻辑整合 ---
     // 1. 首先，等待并发池出现空位（如果已满）
     if (executing.length >= maxConcurrency) {
@@ -847,7 +962,9 @@ async function summarizeDocumentTheme(
   apiKey: string,
   modelName: string,
   apiURL: string,
-  provider?: ModelProvider
+  provider?: ModelProvider,
+  onChunk?: OnChunk,
+  cancelToken?: ProofreadCancelToken | null
 ): Promise<{
   result: string
   total_tokens: number
@@ -856,8 +973,10 @@ async function summarizeDocumentTheme(
   const userPrompt = buildLocalizedThemeUserPrompt(docStructure.title, docStructure.sections)
 
   try {
-    return await callModelAPI(systemPrompt, userPrompt, apiKey, modelName, apiURL, provider)
+    return await callModelAPI(systemPrompt, userPrompt, apiKey, modelName, apiURL, provider, onChunk, cancelToken?.signal)
   } catch (error) {
+    // 取消不属于"主题总结失败"：向上传播，让整个校对流程终止
+    if (cancelToken?.cancelled) throw new ProofreadCancelledError()
     console.error(getLocalizedConsoleMessages().summarizeThemeError, error)
     return {
       result: 'error',
@@ -1141,7 +1260,9 @@ async function proofreadTextWithRAG(
   repositoryNameList?: string[],
   fileName?: string,
   embeddingConfig?: ApiSettings,
-  provider?: ModelProvider
+  provider?: ModelProvider,
+  onChunk?: OnChunk,
+  cancelToken?: ProofreadCancelToken | null
 ): Promise<{ result: ProofreadingCorrection[]; use_tokens: number }> {
   try {
     let systemPrompt = systemContext
@@ -1159,8 +1280,11 @@ async function proofreadTextWithRAG(
         apiKey,
         modelName,
         apiURL,
-        provider
+        provider,
+        onChunk,
+        cancelToken?.signal
       )
+      if (cancelToken?.cancelled) throw new ProofreadCancelledError()
       return { result: parseCorrections(result), use_tokens: total_tokens }
     }
 
@@ -1196,11 +1320,16 @@ async function proofreadTextWithRAG(
         apiKey,
         modelName,
         apiURL,
-        provider
+        provider,
+        onChunk,
+        cancelToken?.signal
       )
+      if (cancelToken?.cancelled) throw new ProofreadCancelledError()
       return { result: parseCorrections(result, ragChunks), use_tokens: total_tokens }
     }
   } catch (error) {
+    // 取消不属于"校对失败"：向上传播，让整个校对流程终止
+    if (cancelToken?.cancelled) throw new ProofreadCancelledError()
     console.error(getLocalizedConsoleMessages().proofTextFailed, error)
     return { result: [], use_tokens: 0 }
   }
@@ -1218,7 +1347,9 @@ export async function proofreadDocument(
   parallelSet: number = 30,
   setTimeLimit?: number,
   onProgress?: (payload: ProofreadProgressPayload) => void,
-  provider?: ModelProvider
+  provider?: ModelProvider,
+  streamSink?: ProofreadStreamSink | null,
+  cancelToken?: ProofreadCancelToken | null
 ): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number }> {
   console.log('process mode is:', mode)
   console.log('process api is:', apiURL, modelName)
@@ -1256,9 +1387,13 @@ export async function proofreadDocument(
         repositoryNameList,
         fileName,
         embeddingConfig,
-        provider
+        provider,
+        chunk => streamSink?.chunk('proofread', 0, '', chunk),
+        cancelToken
       )
+      cancelToken?.throwIfCancelled()
       total_tokens += use_tokens
+      streamSink?.segment('proofread', 0, '', result.length)
 
       onProgress?.({
         stage: 'completed',
@@ -1280,7 +1415,16 @@ export async function proofreadDocument(
       mode,
       message: progressMessages.theme
     })
-    const documentTheme = await summarizeDocumentTheme(docStructure, apiKey, modelName, apiURL, provider)
+    const documentTheme = await summarizeDocumentTheme(
+      docStructure,
+      apiKey,
+      modelName,
+      apiURL,
+      provider,
+      chunk => streamSink?.chunk('theme', 0, '', chunk),
+      cancelToken
+    )
+    cancelToken?.throwIfCancelled()
     const nonEmptySections = getSectionsForProofreading(docStructure.sections)
     if (nonEmptySections.length === 0)
       return {
@@ -1302,9 +1446,10 @@ export async function proofreadDocument(
       const sectionResults = await runWithLimits(
         nonEmptySections,
         parallelSet,
-        async section => {
+        async (section, sectionIndex) => {
+          const sectionLabel = section.title.slice(0, 20)
           const systemContext = `${effectivePrompt}\n${buildLocalizedDocumentContextInjection(docStructure.title, documentTheme.result, section.title)}`
-          return proofreadTextWithRAG(
+          const sectionResult = await proofreadTextWithRAG(
             section.content,
             systemContext,
             apiKey,
@@ -1313,11 +1458,16 @@ export async function proofreadDocument(
             repositoryNameList,
             fileName,
             embeddingConfig,
-            provider
+            provider,
+            chunk => streamSink?.chunk('proofread', sectionIndex, sectionLabel, chunk),
+            cancelToken
           )
+          streamSink?.segment('proofread', sectionIndex, sectionLabel, sectionResult.result.length)
+          return sectionResult
         },
         {
           ...option,
+          shouldCancel: () => cancelToken?.cancelled ?? false,
           onItemCompleted: (completed, total) => {
             onProgress?.({
               stage: 'proofreading',
@@ -1330,6 +1480,7 @@ export async function proofreadDocument(
           }
         }
       )
+      cancelToken?.throwIfCancelled()
       let resultList: ProofreadingCorrection[][] = []
       sectionResults.forEach(item => {
         total_tokens += item.use_tokens
@@ -1337,7 +1488,12 @@ export async function proofreadDocument(
       })
       allCorrections = resultList.flat()
     } else if (mode === 'sentence') {
-      const sentenceTasks: (() => Promise<{ result: ProofreadingCorrection[]; use_tokens: number }>)[] = []
+      const sentenceTasks: {
+        index: number
+        label: string
+        run: () => Promise<{ result: ProofreadingCorrection[]; use_tokens: number }>
+      }[] = []
+      let sentenceIndex = 0
       for (const section of nonEmptySections) {
         // 先按行/制表符拆分再切句：
         // 1. 表格 section 的每行是 \t 连接的单元格，拆分后校对单元落在单个单元格内，
@@ -1354,19 +1510,29 @@ export async function proofreadDocument(
         if (validSentences.length === 0) continue
 
         for (const sentence of validSentences) {
-          sentenceTasks.push(async () => {
-            const systemContext = `${effectivePrompt}\n${buildLocalizedDocumentContextInjection(docStructure.title, documentTheme.result, section.title)}`
-            return proofreadTextWithRAG(
-              sentence,
-              systemContext,
-              apiKey,
-              modelName,
-              apiURL,
-              repositoryNameList,
-              fileName,
-              embeddingConfig,
-              provider
-            )
+          const index = sentenceIndex++
+          const label = sentence.trim().slice(0, 16)
+          sentenceTasks.push({
+            index,
+            label,
+            run: async () => {
+              const systemContext = `${effectivePrompt}\n${buildLocalizedDocumentContextInjection(docStructure.title, documentTheme.result, section.title)}`
+              const sentenceResult = await proofreadTextWithRAG(
+                sentence,
+                systemContext,
+                apiKey,
+                modelName,
+                apiURL,
+                repositoryNameList,
+                fileName,
+                embeddingConfig,
+                provider,
+                chunk => streamSink?.chunk('proofread', index, label, chunk),
+                cancelToken
+              )
+              streamSink?.segment('proofread', index, label, sentenceResult.result.length)
+              return sentenceResult
+            }
           })
         }
       }
@@ -1381,8 +1547,9 @@ export async function proofreadDocument(
       })
 
       if (sentenceTasks.length > 0) {
-        const sentenceResults = await runWithLimits(sentenceTasks, parallelSet, task => task(), {
+        const sentenceResults = await runWithLimits(sentenceTasks, parallelSet, task => task.run(), {
           ...option,
+          shouldCancel: () => cancelToken?.cancelled ?? false,
           onItemCompleted: (completed, total) => {
             onProgress?.({
               stage: 'proofreading',
@@ -1394,6 +1561,7 @@ export async function proofreadDocument(
             })
           }
         })
+        cancelToken?.throwIfCancelled()
         let resultList: ProofreadingCorrection[][] = []
         sentenceResults.forEach(Items => {
           total_tokens += Items.use_tokens
@@ -1402,6 +1570,9 @@ export async function proofreadDocument(
         allCorrections = resultList.flat()
       }
     }
+
+    // 取消发生在收尾阶段时，不返回残缺的部分结果
+    cancelToken?.throwIfCancelled()
 
     // 确保可序列化
     const serializableCorrections = allCorrections.map(correction => ({
@@ -1524,7 +1695,9 @@ export async function reduceAIDetectionDocument(
   parallelSet: number = 30,
   setTimeLimit?: number,
   onProgress?: (payload: ProofreadProgressPayload) => void,
-  provider?: ModelProvider
+  provider?: ModelProvider,
+  streamSink?: ProofreadStreamSink | null,
+  cancelToken?: ProofreadCancelToken | null
 ): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number }> {
   const prompts = getPrompts()
   const reducePrompt = prompts.REDUCE_AI_RATE_SYSTEM_PROMPT || zhCNPrompts.REDUCE_AI_RATE_SYSTEM_PROMPT
@@ -1622,20 +1795,26 @@ export async function reduceAIDetectionDocument(
           userMessage += `\n\n[下一段]\n${placeholderToHuman(nextPara.content)}`
         }
 
+        const paraLabel = `#${index + 1}`
         const { result, total_tokens: tokens } = await callModelAPI(
           reducePrompt,
           userMessage,
           apiKey,
           modelName,
           apiURL,
-          provider
+          provider,
+          chunk => streamSink?.chunk('reduce', index, paraLabel, chunk),
+          cancelToken?.signal
         )
+        if (cancelToken?.cancelled) throw new ProofreadCancelledError()
         let rewritten = cleanAIResponse(result)
         // 还原脚注占位符
         rewritten = humanToPlaceholder(rewritten)
         if (!rewritten || rewritten === para.content.trim()) {
+          streamSink?.segment('reduce', index, paraLabel, 0)
           return { correction: null, tokens }
         }
+        streamSink?.segment('reduce', index, paraLabel, 1)
         return {
           correction: {
             // original 直接来自 docx 抽取的段落文本，可能残留 OMML 边界的零宽字符
@@ -1651,6 +1830,7 @@ export async function reduceAIDetectionDocument(
       },
       {
         ...option,
+        shouldCancel: () => cancelToken?.cancelled ?? false,
         onItemCompleted: (completed, total) => {
           onProgress?.({
             stage: 'reducing',
@@ -1663,6 +1843,7 @@ export async function reduceAIDetectionDocument(
         }
       }
     )
+    cancelToken?.throwIfCancelled()
 
     const allCorrections: ProofreadingCorrection[] = []
     for (const r of results) {
@@ -1727,7 +1908,9 @@ export async function reviewCorrections(
   modelName: string,
   apiURL: string,
   onProgress?: (completed: number, total: number) => void,
-  provider?: ModelProvider
+  provider?: ModelProvider,
+  streamSink?: ProofreadStreamSink | null,
+  cancelToken?: ProofreadCancelToken | null
 ): Promise<{ reviewedResult: ProofreadingCorrection[]; token_usage: number }> {
   const filterReasons = getLocalizedReviewFilterReasons()
 
@@ -1746,6 +1929,7 @@ export async function reviewCorrections(
 
     let allReviewed: ProofreadingCorrection[] = []
     for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+      cancelToken?.throwIfCancelled()
       const batch = batches[batchIdx]
       const userPrompt = buildReviewUserPrompt(batch)
 
@@ -1755,8 +1939,11 @@ export async function reviewCorrections(
         apiKey,
         modelName,
         apiURL,
-        provider
+        provider,
+        chunk => streamSink?.chunk('review', batchIdx, `#${batchIdx + 1}`, chunk),
+        cancelToken?.signal
       )
+      cancelToken?.throwIfCancelled()
       totalTokens += total_tokens
 
       const reviewed = parseCorrections(result)
@@ -1783,6 +1970,7 @@ export async function reviewCorrections(
         }
       }
       allReviewed.push(...batch)
+      streamSink?.segment('review', batchIdx, `#${batchIdx + 1}`, batch.length)
 
       const batchFiltered = batch.filter(c => c.filtered || isNoErrorReason(c.reason))
       if (batchFiltered.length > 0) {
@@ -1805,7 +1993,18 @@ export async function reviewCorrections(
   }
 
   const userPrompt = buildReviewUserPrompt(corrections)
-  const { result, total_tokens } = await callModelAPI(reviewSystemPrompt, userPrompt, apiKey, modelName, apiURL, provider)
+  cancelToken?.throwIfCancelled()
+  const { result, total_tokens } = await callModelAPI(
+    reviewSystemPrompt,
+    userPrompt,
+    apiKey,
+    modelName,
+    apiURL,
+    provider,
+    chunk => streamSink?.chunk('review', 0, '#1', chunk),
+    cancelToken?.signal
+  )
+  cancelToken?.throwIfCancelled()
   totalTokens = total_tokens
 
   const reviewed = parseCorrections(result)
@@ -1832,6 +2031,8 @@ export async function reviewCorrections(
       }
     }
   }
+
+  streamSink?.segment('review', 0, '#1', corrections.length)
 
   const filtered = corrections.filter(c => c.filtered || isNoErrorReason(c.reason))
   if (filtered.length > 0) {

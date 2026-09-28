@@ -21,6 +21,19 @@ import { ModelProvider, getProviderBaseURL } from '../shared/modelProviders'
  * @returns A Promise that resolves to the model's text response.
  */
 
+/** 流式回调：每收到一段增量文本调用一次 */
+export type OnChunk = (text: string) => void
+
+/** 校验 Gemini 响应有效性（流式与非流式共用） */
+function validateGeminiResponse(response: any): void {
+  if (response.promptFeedback?.blockReason) {
+    throw new Error(`Request was blocked due to: ${response.promptFeedback.blockReason}`)
+  }
+  if (!response.candidates || response.candidates.length === 0) {
+    throw new Error('No response candidates found.')
+  }
+}
+
 // gemini接口的实现
 // 但是实际上没有调用
 export async function getGeminiResponse(
@@ -28,7 +41,9 @@ export async function getGeminiResponse(
   userPrompt: string,
   apiKey: string,
   modelName: string,
-  apiURL?: string
+  apiURL?: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   if (!apiKey) {
     throw new Error('API key is missing. Please provide a valid API key.')
@@ -74,21 +89,43 @@ export async function getGeminiResponse(
       }
     ]
 
-    const result = await model.generateContent({
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      generationConfig,
-      safetySettings
-    })
+    if (onChunk) {
+      const streamResult = await model.generateContentStream(
+        {
+          contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+          generationConfig,
+          safetySettings
+        },
+        signal ? { signal } : undefined
+      )
+      let streamed = ''
+      for await (const item of streamResult.stream) {
+        const chunkText = typeof item.text === 'function' ? item.text() : ''
+        if (chunkText) {
+          streamed += chunkText
+          onChunk(chunkText)
+        }
+      }
+      const response = await streamResult.response
+      validateGeminiResponse(response)
+      const text = response.candidates![0].content.parts.map(part => part.text).join('')
+      const usageMetadata = response.usageMetadata as any
+      const total_tokens = usageMetadata?.totalTokenCount
+        ?? ((usageMetadata?.promptTokenCount || 0) + (usageMetadata?.candidatesTokenCount || 0))
+      return { result: text || streamed, total_tokens }
+    }
+
+    const result = await model.generateContent(
+      {
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        generationConfig,
+        safetySettings
+      },
+      signal ? { signal } : undefined
+    )
 
     const response = result.response
-
-    if (response.promptFeedback?.blockReason) {
-      throw new Error(`Request was blocked due to: ${response.promptFeedback.blockReason}`)
-    }
-
-    if (!response.candidates || response.candidates.length === 0) {
-      throw new Error('No response candidates found.')
-    }
+    validateGeminiResponse(response)
 
     const text = response.candidates[0].content.parts.map(part => part.text).join('')
     const usageMetadata = response.usageMetadata as any
@@ -112,7 +149,9 @@ export async function OpenaiGen(
   userPrompt: string,
   apiKey: string,
   modelName: string,
-  apiURL: string
+  apiURL: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   if (!apiKey) {
     throw new Error('API key is missing. Please provide a valid API key.')
@@ -129,13 +168,60 @@ export async function OpenaiGen(
       baseURL: apiURL
     })
 
-    const chatCompletion = await openai.chat.completions.create({
-      model: modelName,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ]
-    })
+    if (onChunk) {
+      // 流式路径：include_usage 让服务端在最后一个 chunk 携带 token 用量。
+      // 部分第三方兼容服务不支持 stream_options 或流式接口本身异常时，
+      // 回退到下方非流式请求（此时会重复计费一次请求，但保证功能可用）。
+      try {
+        const stream = (await openai.chat.completions.create(
+          {
+            model: modelName,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt }
+            ],
+            stream: true,
+            stream_options: { include_usage: true }
+          },
+          signal ? { signal } : undefined
+        )) as unknown as AsyncIterable<any>
+
+        let result = ''
+        let total_tokens = 0
+        for await (const chunk of stream) {
+          const delta = chunk?.choices?.[0]?.delta?.content || ''
+          if (delta) {
+            result += delta
+            onChunk(delta)
+          }
+          if (chunk?.usage?.total_tokens) {
+            total_tokens = chunk.usage.total_tokens
+          }
+        }
+        if (!result) {
+          throw new Error('流式响应内容为空')
+        }
+        return { result, total_tokens }
+      } catch (streamError) {
+        // 取消导致的中止不能回退重发，否则取消后还会再发一次完整请求
+        if (signal?.aborted) throw streamError
+        console.warn(
+          `[OpenaiGen] 流式请求失败，回退到非流式模式:`,
+          streamError instanceof Error ? streamError.message : streamError
+        )
+      }
+    }
+
+    const chatCompletion = await openai.chat.completions.create(
+      {
+        model: modelName,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ]
+      },
+      signal ? { signal } : undefined
+    )
 
     // 添加健壮性检查
     if (
@@ -411,7 +497,9 @@ export async function getAnthropicResponse(
   userPrompt: string,
   apiKey: string,
   modelName: string,
-  apiURL?: string
+  apiURL?: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   if (!apiKey) throw new Error('API key is missing.')
 
@@ -423,13 +511,36 @@ export async function getAnthropicResponse(
     }
     const anthropic = new Anthropic(options)
 
-    const message = await anthropic.messages.create({
+    const createParams: any = {
       model: modelName,
       max_tokens: 2048,
       temperature: 0.7,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
-    })
+    }
+
+    if (onChunk) {
+      const stream = (await anthropic.messages.create(
+        { ...createParams, stream: true },
+        signal ? { signal } : undefined
+      )) as unknown as AsyncIterable<any>
+      let result = ''
+      let inputTokens = 0
+      let outputTokens = 0
+      for await (const event of stream) {
+        if (event.type === 'message_start') {
+          inputTokens = event.message?.usage?.input_tokens || 0
+        } else if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+          result += event.delta.text
+          onChunk(event.delta.text)
+        } else if (event.type === 'message_delta') {
+          outputTokens = event.usage?.output_tokens || 0
+        }
+      }
+      return { result, total_tokens: inputTokens + outputTokens }
+    }
+
+    const message = await anthropic.messages.create(createParams, signal ? { signal } : undefined)
 
     const result = message.content[0]?.type === 'text' ? message.content[0].text : ''
     const total_tokens = message.usage?.input_tokens + (message.usage?.output_tokens || 0) || 0
@@ -450,10 +561,12 @@ export async function getDoubaoResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://ark.cn-beijing.volces.com/api/v3'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 3. 阿里云 (通义千问 Qwen) ======================
@@ -464,10 +577,12 @@ export async function getQwenResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 4. 腾讯云 (混元 Hunyuan) ======================
@@ -478,10 +593,12 @@ export async function getHunyuanResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://api.hunyuan.cloud.tencent.com/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 5. 百度云 (文心一言 ERNIE / 千帆) ======================
@@ -492,10 +609,12 @@ export async function getErnieResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://qianfan.baidubce.com/v2'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 6. GLM (智谱AI ChatGLM) ======================
@@ -506,10 +625,12 @@ export async function getGLMResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://open.bigmodel.cn/api/paas/v4'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 7. Minimax ======================
@@ -520,10 +641,12 @@ export async function getMinimaxResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://api.minimax.io/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 8. Kimi (Moonshot AI) ======================
@@ -534,10 +657,12 @@ export async function getKimiResponse(
   systemPrompt: string,
   userPrompt: string,
   apiKey: string,
-  modelName: string
+  modelName: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://api.moonshot.cn/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
 }
 
 // ====================== 9. 模拟 Claude Code ======================
@@ -609,7 +734,9 @@ export async function getClaudeCodeResponse(
   userPrompt: string,
   apiKey: string,
   modelName: string,
-  apiURL?: string
+  apiURL?: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   if (!apiKey) throw new Error('API key is missing.')
 
@@ -648,7 +775,7 @@ export async function getClaudeCodeResponse(
       }
     }
 
-    const stream = (await client.beta.messages.create(params as any)) as unknown as AsyncIterable<any>
+    const stream = (await client.beta.messages.create(params as any, signal ? { signal } : undefined)) as unknown as AsyncIterable<any>
 
     let fullText = ''
     let inputTokens = 0
@@ -662,6 +789,7 @@ export async function getClaudeCodeResponse(
         case 'content_block_delta':
           if (event.delta?.type === 'text_delta') {
             fullText += event.delta.text
+            onChunk?.(event.delta.text)
           }
           break
         case 'message_delta':
@@ -688,45 +816,47 @@ export async function getModelResponse(
   userPrompt: string,
   apiKey: string,
   modelName: string,
-  customBaseURL?: string
+  customBaseURL?: string,
+  onChunk?: OnChunk,
+  signal?: AbortSignal
 ): Promise<{ result: string; total_tokens: number }> {
   switch (provider) {
     case ModelProvider.ANTHROPIC:
-      return await getAnthropicResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL)
+      return await getAnthropicResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)
 
     case ModelProvider.GEMINI:
-      return await getGeminiResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL)
+      return await getGeminiResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)
 
     case ModelProvider.DOUBAO:
-      return await getDoubaoResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getDoubaoResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.QWEN:
-      return await getQwenResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getQwenResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.HUNYUAN:
-      return await getHunyuanResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getHunyuanResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.ERNIE:
-      return await getErnieResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getErnieResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.GLM:
-      return await getGLMResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getGLMResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.MINIMAX:
-      return await getMinimaxResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getMinimaxResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.KIMI:
-      return await getKimiResponse(systemPrompt, userPrompt, apiKey, modelName)
+      return await getKimiResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
 
     case ModelProvider.CLAUDE_CODE:
-      return await getClaudeCodeResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL)
+      return await getClaudeCodeResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)
 
     case ModelProvider.OPENAI_COMPATIBLE:
     default:
       if (!customBaseURL) {
         throw new Error('Custom base URL is required for OpenAI compatible provider')
       }
-      return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, customBaseURL)
+      return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)
   }
 }
 

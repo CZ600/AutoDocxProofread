@@ -1,8 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { get } from 'http'
-import test from 'node:test'
 import { apiSettings } from './database'
-import { ProofreadProgressPayload } from '../shared/proofreadProgress'
+import { ProofreadProgressPayload, ProofreadStreamPayload } from '../shared/proofreadProgress'
 import { PromptSettings } from '../shared/promptSettings'
 
 console.log('this message from the preload')
@@ -12,6 +10,13 @@ const proofreadProgressListeners = new WeakMap<
   (payload: ProofreadProgressPayload) => void,
   (_event: any, payload: ProofreadProgressPayload) => void
 >()
+
+const PROOFREAD_STREAM_CHANNEL = 'proofread-stream'
+const proofreadStreamListeners = new WeakMap<
+  (payload: ProofreadStreamPayload) => void,
+  (_event: any, payload: ProofreadStreamPayload) => void
+>()
+
 
 // contextBridge.exposeInMainWorld 是一个安全机制，它允许你在预加载脚本中定义一些函数或对象，并将它们注入到网页的全局 window 对象中。
 // 第一个参数 electronAPI 表示将要挂载到window上的属性名称
@@ -56,7 +61,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     embeddingConfig?: apiSettings,
     setTimeLimit?: number,
     parallelSet?: number,
-    reviewModelId?: number | null
+    reviewModelId?: number | null,
+    runId?: string,
+    proofMode?: string
   ) => {
     // 确保传递的参数是可序列化的
     const serializableParams = {
@@ -66,7 +73,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
       embeddingConfig: embeddingConfig ? { ...embeddingConfig } : undefined,
       setTimeLimit: setTimeLimit || undefined,
       parallelSet: parallelSet || 30,
-      reviewModelId: reviewModelId ?? null
+      reviewModelId: reviewModelId ?? null,
+      runId: runId || undefined,
+      proofMode: proofMode || undefined
     }
 
     return ipcRenderer.invoke(
@@ -77,9 +86,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       serializableParams.embeddingConfig,
       serializableParams.setTimeLimit,
       serializableParams.parallelSet,
-      serializableParams.reviewModelId
+      serializableParams.reviewModelId,
+      serializableParams.runId,
+      serializableParams.proofMode
     )
   },
+
+  // 取消当前校对任务：中止在途 LLM 请求并停止派发后续任务
+  cancelProofread: (runId?: string) => ipcRenderer.invoke('cancelProofread', runId),
 
   // 导出修正到文件中
   onProofreadProgress: (callback: (payload: ProofreadProgressPayload) => void) => {
@@ -98,6 +112,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
     if (!listener) return
     ipcRenderer.removeListener(PROOFREAD_PROGRESS_CHANNEL, listener)
     proofreadProgressListeners.delete(callback)
+  },
+  // 流式输出事件：LLM 增量文本（kind=chunk）与分段完成（kind=segment）
+  onProofreadStream: (callback: (payload: ProofreadStreamPayload) => void) => {
+    const listener = (_event: any, payload: ProofreadStreamPayload) => {
+      callback(payload)
+    }
+    proofreadStreamListeners.set(callback, listener)
+    ipcRenderer.on(PROOFREAD_STREAM_CHANNEL, listener)
+    return () => {
+      ipcRenderer.removeListener(PROOFREAD_STREAM_CHANNEL, listener)
+      proofreadStreamListeners.delete(callback)
+    }
+  },
+  offProofreadStream: (callback: (payload: ProofreadStreamPayload) => void) => {
+    const listener = proofreadStreamListeners.get(callback)
+    if (!listener) return
+    ipcRenderer.removeListener(PROOFREAD_STREAM_CHANNEL, listener)
+    proofreadStreamListeners.delete(callback)
   },
   exportCorrectedDocx: (config: any) => {
     // 确保传递的参数是可序列化的
