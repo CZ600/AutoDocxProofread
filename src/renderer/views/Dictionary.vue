@@ -330,6 +330,10 @@ watch(
 onMounted(async () => {
   await Promise.all([getRepositories(), getALLAPISettings()])
   await initSelect()
+  // 知识库引擎加载失败（如杀毒软件拦截 vec0.dll）时列表静默为空，这里显式提示原因
+  if (repositoryStore.lastError) {
+    ElMessage.error({ message: repositoryStore.lastError, duration: 0, showClose: true })
+  }
 })
 </script>
 

@@ -62,8 +62,14 @@ export function getVecExtensionPath(): string {
 
 /**
  * 在给定 sqlite 连接上加载 vec0 向量扩展。
- * 幂等：可重复调用，sqlite3 驱动对重复 loadExtension 会抛 "already loaded"，
+ * 幂等：可重复调用，sqlite3 驱动对重复 loadExtension 会报 "already loaded"，
  * 这里捕获并视为成功。
+ *
+ * 错误处理（v1.2.2 修复）：sqlite 包的 loadExtension 已是 Promise 包装，加载失败
+ * （如杀毒软件拦截 vec0.dll 时的 Win32 错误 126"找不到指定的模块"）会 reject；
+ * 旧实现的 catch 条件 `msg.includes('not authorized') === false` 几乎恒真，
+ * 把所有加载错误吞掉，上层只能看到误导性的 "no such function: vec_version"。
+ * 现在把失败原因连同 DLL 路径、杀软排查指引一起抛出。
  *
  * @param db 已通过 sqlite.open() 打开的连接（driver=sqlite3.Database）
  * @returns 扩展版本字符串（来自 vec_version()），便于上层日志确认
@@ -71,15 +77,17 @@ export function getVecExtensionPath(): string {
 export async function loadVecExtension(db: Database): Promise<string> {
   const extPath = getVecExtensionPath()
   try {
-    // sqlite3 驱动的 loadExtension 是同步 API，包一层 await 以兼容 Promise 链。
-    // 注意：sqlite3 默认出于安全考虑关闭 extension 加载，open() 时需 enableLoadExtension。
-    await (db as any).loadExtension(extPath)
+    await db.loadExtension(extPath)
   } catch (err: any) {
     const msg = String(err?.message || err)
-    if (msg.includes('already') || msg.includes('not authorized') === false) {
-      // "already in use" / 已加载 —— 视为成功，继续往下读版本
+    if (msg.includes('already')) {
+      // "already loaded" / 重复加载 —— 视为成功，继续往下读版本
     } else {
-      throw new Error(`加载 sqlite-vec 扩展失败 (${extPath}): ${msg}`)
+      throw new Error(
+        `向量扩展加载失败 (${extPath}): ${msg}。` +
+          `若该文件存在仍加载失败，通常是杀毒软件拦截了 vec0.dll，` +
+          `请将其加入白名单后重启软件`
+      )
     }
   }
 

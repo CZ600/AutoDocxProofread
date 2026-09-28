@@ -15,7 +15,10 @@ import { defineStore } from 'pinia'
  */
 export const useRepositoryStore = defineStore('repository', {
   state: () => ({
-    list: [] as string[]
+    list: [] as string[],
+    // 最近一次拉取失败的原因（成功时清空）。知识库引擎（vec0 扩展）加载失败时，
+    // 列表会静默变空，这里保留错误文本供界面提示用户，避免"知识库消失"的误解。
+    lastError: '' as string
   }),
 
   getters: {
@@ -30,8 +33,10 @@ export const useRepositoryStore = defineStore('repository', {
         const electronAPI = (window as any).electronAPI
         const result = await electronAPI.listRepositories()
         this.list = Array.isArray(result) ? [...result] : []
+        this.lastError = ''
         return this.list
-      } catch (error) {
+      } catch (error: any) {
+        this.lastError = String(error?.message || error)
         console.error('获取知识库列表失败:', error)
         return []
       }

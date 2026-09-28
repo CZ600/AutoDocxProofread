@@ -1343,7 +1343,12 @@ onMounted(async () => {
     return
   }
   initProofreadProgressListener()
-  getRepositories()
+  // 知识库引擎加载失败（如杀毒软件拦截 vec0.dll）时下拉静默为空，这里显式提示原因
+  getRepositories().then(() => {
+    if (repositoryStore.lastError) {
+      ElMessage.error({ message: repositoryStore.lastError, duration: 0, showClose: true })
+    }
+  })
   initCorrectStatus()
 
   if (fileStore.filePath && fileStore.fileName) {

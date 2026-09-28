@@ -836,9 +836,11 @@ export const registerIpcHandlers = () => {
     }
   })
   // 向量数据库 - 删除整个表（单个知识库）
-  ipcMain.handle('deleteRepository', (event, repositoryName: string) => {
+  ipcMain.handle('deleteRepository', async (event, repositoryName: string) => {
     try {
-      deleteRepository(repositoryName)
+      // deleteRepository 是异步函数，必须 await：否则其内部异常不会进本 catch，
+      // 前端会收到 resolve(true)，删除失败也提示"删除成功"
+      await deleteRepository(repositoryName)
       return true
     } catch (error) {
       console.log('failed to delete ${repositoryName} because:', error)
@@ -905,7 +907,8 @@ export const registerIpcHandlers = () => {
     if (deleteFileName) {
       return deleteFileName
     } else {
-      throw error('delete the file ${repositoryName} error')
+      // 原写法 throw error(...) 引用未定义的小写 error，会抛 ReferenceError
+      throw new Error(`delete the file ${filename} in ${repositoryName} error`)
     }
   })
   // 获取不重复的文件列表

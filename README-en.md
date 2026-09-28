@@ -163,16 +163,23 @@ First-time use requires configuring a supported large language model API:
 
 ### Changelog
 
-- v1.2.1
+- v1.2.2
   - Added table content proofreading; table text now participates in proofreading row by row (previously skipped)
   - Fixed modification write-back loss for paragraphs containing formulas; improved tolerance of footnote/formula marker restoration
   - Added a recent files list for quickly reopening previously proofread documents
   - Support selecting multiple knowledge bases simultaneously during proofreading
   - Rearranged the API settings page, moved language switching into settings, and added delete confirmation for API entries
+  - Fixed the issue where knowledge base engine load failures showed no feedback in the UI: the failure cause and extension path are now reported clearly, with a hint to check antivirus interception of vec0.dll (fixes the user-reported "knowledge base added but not displayed" issue)
+  - Fixed the issue where deleting a knowledge base reported "success" even when the deletion failed
+  - Fixed a crash in the error message itself when deleting knowledge base files failed
+- v1.2.1
+  - Reduced installer size
+  - Replaced LanceDB with sqlite-vec for a lighter footprint
+  - Improved RAG availability
 - v1.2.0
+  - Reduced installer size
   - Improved the reduce AI detection effect
-  - Improved document structure recognition and paragraph matching accuracy
-  - Replaced the vector engine with sqlite-vec, greatly reducing the installer size
+  - Improved paragraph recognition and document structure / paragraph matching accuracy
   - Improved RAG retrieval quality
 - v1.1.9
   - Updated AI format parsing
