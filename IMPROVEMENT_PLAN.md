@@ -77,10 +77,10 @@
 
 ### 任务清单
 
-- [ ] **入库加密**：主进程保存 API 设置处（`ipcHandlers.ts` 的 update/insert handler，写 `api_settings.apiKey`，参考 `database.ts:63-64/119-133`）改为 `electron.safeStorage.encryptString` 后存 base64。
-- [ ] **读取兼容迁移**：读取时 `safeStorage.isEncryptionAvailable()` 判断 + try decrypt；解密失败视为旧明文记录正常使用，并在下次保存时自动升级为密文（Linux 无 keyring 时降级明文并 console.warn）。
-- [ ] **清除明文日志**：`ipcHandlers.ts:242/268/344/420/496/572`（完整 key 直接 console.log）与 `proof.ts:1297`（embedding key）改为打码输出（如 `key.slice(0,6) + '...'`）。
-- [ ] **（可选加固）脱敏回传**：`get-all-api-settings`（`ipcHandlers.ts:220-222`）返回脱敏副本；编辑弹窗回显掩码、空值表示不修改原 key。改动涉及编辑流程 UX，可单独决策是否做。
+- [x] **入库加密**：主进程保存 API 设置处（`ipcHandlers.ts` 的 update/insert handler，写 `api_settings.apiKey`，参考 `database.ts:63-64/119-133`）改为 `electron.safeStorage.encryptString` 后存 base64。（实施说明：加密/解密收敛在 `src/main/apiKeyCrypto.ts`，挂在 DB 层读写（insertAPISetting/updateAPISettingById 加密，getAPISettingById/getAllAPISettings/getAPISettings 解密），IPC 与上层消费方无需改动；密文带 `enc:v1:` 前缀标记，天然区分新旧格式且加密幂等。）
+- [x] **读取兼容迁移**：读取时 `safeStorage.isEncryptionAvailable()` 判断 + try decrypt；解密失败视为旧明文记录正常使用，并在下次保存时自动升级为密文（Linux 无 keyring 时降级明文并 console.warn）。（实施说明：不带 `enc:v1:` 前缀的旧明文记录读取时原样返回，下次保存自动加密；解密失败原样返回让上游以鉴权失败可见地暴露问题；单元测试见 `__tests__/apiKeyCrypto.test.ts`。）
+- [x] **清除明文日志**：`ipcHandlers.ts:242/268/344/420/496/572`（完整 key 直接 console.log）与 `proof.ts:1297`（embedding key）改为打码输出（如 `key.slice(0,6) + '...'`）。（实施说明：共打码 10 处，另含 `embeddingConfig` 对象 dump 一处——其中含 apiKey，展开为打码副本再输出。）
+- [ ] **（可选加固）脱敏回传**：`get-all-api-settings`（`ipcHandlers.ts:220-222`）返回脱敏副本；编辑弹窗回显掩码、空值表示不修改原 key。改动涉及编辑流程 UX，可单独决策是否做。（未实施：涉及编辑/知识库/格式克隆等多条取 key 链路的 UX 改造，暂缓。注意：渲染层 apiStore 仍会把选中的 key 持久化进 localStorage，此项是消除该明文落盘点的前提。）
 
 ### 风险
 

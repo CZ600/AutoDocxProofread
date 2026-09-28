@@ -2,6 +2,7 @@ import { ipcMain, session, BrowserWindow, type IpcMainInvokeEvent } from 'electr
 import { dialog } from 'electron'
 import * as path from 'path'
 import { DB } from './database'
+import { maskKey } from './apiKeyCrypto'
 import { testAPI, testAPIWithProvider } from './chat'
 import { ModelProvider, getProviderBaseURL, requiresBaseURL } from '../shared/modelProviders'
 import {
@@ -185,7 +186,7 @@ export const registerIpcHandlers = () => {
 
   ipcMain.handle('set-api', async (event, URL, Key, modelName, provider = ModelProvider.OPENAI_COMPATIBLE) => {
     try {
-      console.log('add a new api setting:', URL, Key, modelName, provider)
+      console.log('add a new api setting:', URL, maskKey(Key), modelName, provider)
       api_info.apiKey = Key
       api_info.apiURL = URL
       api_info.modelName = modelName
@@ -204,7 +205,7 @@ export const registerIpcHandlers = () => {
   // 获取所有api设置
   ipcMain.handle('update-api', async (event, id, URL, Key, modelName, provider) => {
     try {
-      console.log('update api setting:', id, URL, Key, modelName, provider)
+      console.log('update api setting:', id, URL, maskKey(Key), modelName, provider)
       api_info.apiKey = Key
       api_info.apiURL = URL
       api_info.modelName = modelName
@@ -238,7 +239,7 @@ export const registerIpcHandlers = () => {
       console.log('Please input all the parameters!')
       return false
     } else {
-      console.log('Testing API:', URL, Key, modelName)
+      console.log('Testing API:', URL, maskKey(Key), modelName)
     }
     const result = await testAPI(URL, Key, modelName)
     return result
@@ -249,7 +250,7 @@ export const registerIpcHandlers = () => {
       console.log('Please input all the parameters!')
       return false
     } else {
-      console.log('Testing API with provider:', provider, URL, Key, modelName)
+      console.log('Testing API with provider:', provider, URL, maskKey(Key), modelName)
     }
     const result = await testAPIWithProvider(provider, URL, Key, modelName)
     return result
@@ -264,7 +265,7 @@ export const registerIpcHandlers = () => {
       api_info.provider = provider
       api_info.parallel = parallel
       api_info.TimeLimit = TimeLimit
-      console.log('Selected API:', URL, Key, modelName, parallel, TimeLimit, provider)
+      console.log('Selected API:', URL, maskKey(Key), modelName, parallel, TimeLimit, provider)
       return true
     }
   )
@@ -321,7 +322,7 @@ export const registerIpcHandlers = () => {
           '-----------------------------------------------processing docx file-------------------------------------------------------'
         )
         console.info('Processing settings:', Model, filePath)
-        console.info('embedding settings:', repositoryNameList, embeddingConfig)
+        console.info('embedding settings:', repositoryNameList, embeddingConfig ? { ...embeddingConfig, apiKey: maskKey(embeddingConfig.apiKey) } : embeddingConfig)
         console.info('the parallel set is:', parallelSet)
         console.info('the time limit of process is:', setTimeLimit)
 
@@ -346,7 +347,7 @@ export const registerIpcHandlers = () => {
           }
         }
         if (Model === 'wordError') {
-          console.log('will process by the model:', api_info.apiKey, api_info.apiURL, api_info.modelName)
+          console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           let { proofResult, token_usage } = await proofreadDocument(
             filePath,
             resolveProofMode(Model, proofMode),
@@ -422,7 +423,7 @@ export const registerIpcHandlers = () => {
             }
           }
         } else if (Model === 'ComprehensiveError') {
-          console.log('will process by the model:', api_info.apiKey, api_info.apiURL, api_info.modelName)
+          console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           let { proofResult, token_usage } = await proofreadDocument(
             filePath,
             resolveProofMode(Model, proofMode),
@@ -498,7 +499,7 @@ export const registerIpcHandlers = () => {
             }
           }
         } else if (Model === 'polish') {
-          console.log('will process by the model:', api_info.apiKey, api_info.apiURL, api_info.modelName)
+          console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           let { proofResult, token_usage } = await proofreadDocument(
             filePath,
             'full',
@@ -574,7 +575,7 @@ export const registerIpcHandlers = () => {
             }
           }
         } else if (Model === 'reduceAI') {
-          console.log('will reduce AI detection rate by model:', api_info.apiKey, api_info.apiURL, api_info.modelName)
+          console.log('will reduce AI detection rate by model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           const sendProgress = (payload: ProofreadProgressPayload) => {
             event.sender.send(PROOFREAD_PROGRESS_CHANNEL, payload)
           }

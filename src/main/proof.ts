@@ -5,6 +5,7 @@ import { OpenaiGen, getModelResponse, OnChunk } from './chat'
 import path from 'path'
 import { app } from 'electron'
 import { queryDocuments } from './lancedb'
+import { maskKey } from './apiKeyCrypto'
 import { error } from 'console'
 import { ProofreadProgressPayload, ProofreadStreamPayload, ProofreadStreamStage } from '../shared/proofreadProgress'
 import {
@@ -1294,7 +1295,7 @@ async function proofreadTextWithRAG(
       const embApiURL = embeddingConfig?.apiURL || apiURL
       const embModelName = embeddingConfig?.modelName || modelName
       console.log('------------------------setting of RAG-------------------------------------')
-      console.log('embedding key:', embApiKey)
+      console.log('embedding key:', maskKey(embApiKey))
       console.log('embedding URL:', embApiURL)
       console.log('embedding modelName:', embModelName)
 

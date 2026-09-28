@@ -7,6 +7,7 @@ import { promises } from 'dns'
 import { b } from 'vite/dist/node/types.d-aGj9QkWt'
 import { getEmbedding } from './chat'
 import { ModelProvider } from '../shared/modelProviders'
+import { encryptApiKey, decryptApiKey } from './apiKeyCrypto'
 
 // 定义数据类型（TypeScript 类型安全）
 export interface User {
@@ -127,7 +128,7 @@ export class DB {
       const result = await db.run(
         `INSERT INTO api_settings (apiURL, apiKey, modelName, provider) VALUES (?, ?, ?, ?)`,
         apiURL,
-        apiKey,
+        encryptApiKey(apiKey),
         modelName,
         provider
       )
@@ -148,7 +149,7 @@ export class DB {
     const db = await DB.getInstance()
     try {
       let query = `UPDATE api_settings SET apiURL = ?, apiKey = ?, modelName = ?`
-      const params: any[] = [apiURL, apiKey, modelName]
+      const params: any[] = [apiURL, encryptApiKey(apiKey), modelName]
 
       if (provider !== undefined && provider !== null) {
         query += `, provider = ?`
@@ -198,11 +199,11 @@ export class DB {
     }
   }
 
-  // 根据id查询api记录
+  // 根据id查询api记录（apiKey 解密后返回，兼容旧明文记录）
   static async getAPISettingById(id: number): Promise<apiSettings | null> {
     const db = await DB.getInstance()
     const result = await db.get(`SELECT * FROM api_settings WHERE id = ?`, id)
-    return result || null
+    return result ? { ...result, apiKey: decryptApiKey(result.apiKey) } : null
   }
 
   static async getHistoryById(id: number): Promise<proofHistory | null> {
@@ -253,12 +254,12 @@ export class DB {
    * @returns apiSettings 数组
    */
   static async getAllAPISettings(): Promise<apiSettings[]> {
-    // 返回apiSettings 数组
+    // 返回apiSettings 数组（apiKey 解密后返回，兼容旧明文记录）
     const db = await DB.getInstance()
     const rows = await db.all<apiSettings[]>(
       `SELECT id, apiURL, apiKey, modelName, provider, created_at FROM api_settings ORDER BY created_at DESC`
     )
-    return rows
+    return rows.map(row => ({ ...row, apiKey: decryptApiKey(row.apiKey) }))
   }
 
   static async getALLHistory(): Promise<proofHistory[]> {
@@ -273,6 +274,6 @@ export class DB {
   static async getAPISettings(): Promise<apiSettings | null> {
     const db = await DB.getInstance()
     const row = await db.get<apiSettings>(`SELECT * FROM api_settings ORDER BY created_at DESC LIMIT 1`)
-    return row || null
+    return row ? { ...row, apiKey: decryptApiKey(row.apiKey) } : null
   }
 }
