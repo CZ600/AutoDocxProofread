@@ -29,6 +29,7 @@
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
     "eslint": "^8.0.1",
+    "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.25.0",
     "eslint-plugin-vue": "^9.25.0",
     "git-cz": "^4.9.0",
