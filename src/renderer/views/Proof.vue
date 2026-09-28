@@ -1,12 +1,12 @@
 <template>
   <div class="proof-results-panel">
-    <div class="results-container" v-if="proofreadingResults.length > 0">
+    <div v-if="proofreadingResults.length > 0" class="results-container">
       <el-collapse v-model="activeNames">
         <el-collapse-item
           v-for="(item, index) in proofreadingResults"
+          :id="`error-item-${index}`"
           :key="index"
           :name="index"
-          :id="`error-item-${index}`"
           :class="[`correction-item type-${(item.type || '').toLowerCase()}`, { 'correction-item-rejected': item.rejected }]"
         >
           <template #title>
@@ -144,6 +144,8 @@ const proofreadingResults = computed({
 })
 const activeNames = ref([])
 let previewFocusTimer = null
+// 平滑滚动后恢复 content-visibility 的延迟句柄：组件卸载时需要清理
+let restoreVisibilityTimer = null
 
 // ---- 建议文本编辑 ----
 const editingIndex = ref(-1)
@@ -290,7 +292,7 @@ const scrollPreviewToCorrection = index => {
       })
       focusPreviewHighlight(highlightEl)
       // 平滑滚动结束后恢复按需渲染
-      setTimeout(restoreVisibility, 700)
+      restoreVisibilityTimer = setTimeout(restoreVisibility, 700)
     })
   )
   return true
@@ -409,6 +411,10 @@ onUnmounted(() => {
   if (previewFocusTimer) {
     clearTimeout(previewFocusTimer)
     previewFocusTimer = null
+  }
+  if (restoreVisibilityTimer) {
+    clearTimeout(restoreVisibilityTimer)
+    restoreVisibilityTimer = null
   }
 })
 </script>

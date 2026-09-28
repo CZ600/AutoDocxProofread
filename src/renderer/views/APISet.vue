@@ -3,10 +3,10 @@
     <el-tabs v-model="activeTab" class="custom-tabs">
       <el-tab-pane :label="t('apiSettings.tabAPI')" name="api">
         <div class="tab-content">
-          <el-alert v-if="showAlertSuccess" type="success" auto-close="4000" show-icon class="fade-slide">
+          <el-alert v-if="showAlertSuccess" type="success" show-icon class="fade-slide">
             {{ alertTitle }}
           </el-alert>
-          <el-alert v-if="showAlertError" type="error" auto-close="4000" show-icon class="fade-slide">
+          <el-alert v-if="showAlertError" type="error" show-icon class="fade-slide">
             {{ alertTitle }}
           </el-alert>
 
@@ -16,7 +16,7 @@
             v-model:visible="dialogVisible"
             :mode="dialogMode"
             :initial-data="editingApi"
-            @submit="handleSubmitApi"
+            :submit-handler="handleSubmitApi"
           />
 
           <div class="setting-group">
@@ -34,7 +34,7 @@
             </div>
             <div class="lang-row">
               <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
-              <el-select v-model="currentLocale" @change="handleLocaleChange" size="default" class="lang-select">
+              <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
                 <el-option label="简体中文" value="zh-CN" />
                 <el-option label="English" value="en" />
               </el-select>
@@ -90,7 +90,7 @@
                 </el-select>
               </el-form-item>
               <div class="button-group">
-                <el-button @click="handleClearReviewModel" :icon="Delete" class="btn-subtle">
+                <el-button :icon="Delete" class="btn-subtle" @click="handleClearReviewModel">
                   {{ t('apiSettings.restoreDefault') }}
                 </el-button>
               </div>
@@ -156,12 +156,13 @@ const openEditDialog = (api: ApiFormData) => {
   dialogVisible.value = true
 }
 
-const handleSubmitApi = async (data: ApiFormData) => {
+// 由 AddApiDialog 通过 submitHandler 调用：返回保存结果供其控制 loading 与关闭
+const handleSubmitApi = async (data: ApiFormData): Promise<boolean> => {
   const success = dialogMode.value === 'edit' ? await updateApi(data) : await addApi(data)
   if (success) {
-    dialogVisible.value = false
     editingApi.value = null
   }
+  return success
 }
 
 const handleClearReviewModel = () => {

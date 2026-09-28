@@ -62,6 +62,28 @@ const maskApiKey = (key: string) => {
   return `${trimmed.slice(0, 4)}***${trimmed.slice(-4)}`
 }
 
+// ---- 删除结果横幅：模块级共享 ----
+// ApiSelector（自己的 composable 实例）触发删除，横幅由 APISet 页展示，
+// 必须跨组件实例共享；置位 4 秒后自动复位，避免横幅永久驻留。
+const showAlertSuccess = ref(false)
+const showAlertError = ref(false)
+const alertTitle = ref('')
+let alertResetTimer: ReturnType<typeof setTimeout> | null = null
+
+const showAlertBanner = (type: 'success' | 'error', title: string) => {
+  if (alertResetTimer) {
+    clearTimeout(alertResetTimer)
+  }
+  showAlertSuccess.value = type === 'success'
+  showAlertError.value = type === 'error'
+  alertTitle.value = title
+  alertResetTimer = setTimeout(() => {
+    showAlertSuccess.value = false
+    showAlertError.value = false
+    alertResetTimer = null
+  }, 4000)
+}
+
 export function useApiSettings() {
   const { t } = useI18n()
   const electronAPI = window.electronAPI
@@ -94,10 +116,6 @@ export function useApiSettings() {
       apiStore.setTimeLimit(value)
     }
   })
-
-  const showAlertSuccess = ref(false)
-  const showAlertError = ref(false)
-  const alertTitle = ref('')
 
   const fetchAllApiSettings = async () => {
     try {
@@ -155,7 +173,7 @@ export function useApiSettings() {
             payload.key,
             payload.name,
             payload.provider
-          )
+        )
         : await electronAPI.APISettings(payload.URL, payload.key, payload.name, payload.provider)
 
       const success = isEdit ? result === true : result === 'success'
@@ -200,14 +218,12 @@ export function useApiSettings() {
     try {
       const res = await electronAPI.deleteOneAPI(id)
       if (!res.isSuccess) {
-        showAlertError.value = true
-        alertTitle.value = t('useApiSettings.deleteFailed')
+        showAlertBanner('error', t('useApiSettings.deleteFailed'))
         ElMessage.error(t('useApiSettings.deleteFailed'))
         return false
       }
 
-      showAlertSuccess.value = true
-      alertTitle.value = t('useApiSettings.deleteSuccess')
+      showAlertBanner('success', t('useApiSettings.deleteSuccess'))
       await fetchAllApiSettings()
 
       if (apiStore.selectedApi.id === id) {

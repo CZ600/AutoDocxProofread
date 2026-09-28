@@ -6,46 +6,46 @@
       <div class="header-content">
         <div class="file-info-container">
           <template v-if="activeMode !== 'format-clone'">
-          <el-dropdown placement="bottom" trigger="click" :disabled="proofreadingResults.length === 0">
-            <el-button text type="primary" size="default" class="bar-btn apply-changes-btn" :title="t('proof.applyChanges')">
-              <span>{{ t('proof.applyChanges') }}</span>
-              <el-icon><ArrowDown /></el-icon>
-            </el-button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="applyALLCorrection()">
-                  <el-icon style="margin-right: 8px"><Select /></el-icon>
-                  {{ t('proof.applyAllCount', { count: proofreadingResults.filter(r => !r.applied && !r.rejected).length }) }}
-                </el-dropdown-item>
-                <el-dropdown-item divided>
-                  <span style="font-weight: 600; color: #606266">{{ t('proof.applyByCategory') }}</span>
-                </el-dropdown-item>
-                <el-dropdown-item
-                  v-for="cat in availableCategories"
-                  :key="cat.value"
-                  @click="applyByCategory(cat.value)"
-                >
-                  <span class="category-badge" :class="`category-${cat.value.toLowerCase()}`">{{ cat.label }}</span>
-                  <span style="margin-left: 8px">{{ getCategoryCount(cat.value) }}</span>
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="undoAllCorrections()" :disabled="proofreadingResults.filter(r => r.applied).length === 0">
-                  <el-icon style="margin-right: 8px"><RefreshLeft /></el-icon>
-                  {{ t('proof.undoAllCount', { count: proofreadingResults.filter(r => r.applied).length }) }}
-                </el-dropdown-item>
-                <el-dropdown-item divided>
-                  <span style="font-weight: 600; color: #606266">{{ t('proof.undoByCategory') }}</span>
-                </el-dropdown-item>
-                <el-dropdown-item
-                  v-for="cat in appliedCategories"
-                  :key="'undo-' + cat.value"
-                  @click="undoByCategory(cat.value)"
-                >
-                  <span class="category-badge" :class="`category-${cat.value.toLowerCase()}`">{{ cat.label }}</span>
-                  <span style="margin-left: 8px">{{ getAppliedCategoryCount(cat.value) }}</span>
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+            <el-dropdown placement="bottom" trigger="click" :disabled="proofreadingResults.length === 0">
+              <el-button text type="primary" size="default" class="bar-btn apply-changes-btn" :title="t('proof.applyChanges')">
+                <span>{{ t('proof.applyChanges') }}</span>
+                <el-icon><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="applyALLCorrection()">
+                    <el-icon style="margin-right: 8px"><Select /></el-icon>
+                    {{ t('proof.applyAllCount', { count: proofreadingResults.filter(r => !r.applied && !r.rejected).length }) }}
+                  </el-dropdown-item>
+                  <el-dropdown-item divided>
+                    <span style="font-weight: 600; color: #606266">{{ t('proof.applyByCategory') }}</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-for="cat in availableCategories"
+                    :key="cat.value"
+                    @click="applyByCategory(cat.value)"
+                  >
+                    <span class="category-badge" :class="`category-${cat.value.toLowerCase()}`">{{ cat.label }}</span>
+                    <span style="margin-left: 8px">{{ getCategoryCount(cat.value) }}</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item divided :disabled="proofreadingResults.filter(r => r.applied).length === 0" @click="undoAllCorrections()">
+                    <el-icon style="margin-right: 8px"><RefreshLeft /></el-icon>
+                    {{ t('proof.undoAllCount', { count: proofreadingResults.filter(r => r.applied).length }) }}
+                  </el-dropdown-item>
+                  <el-dropdown-item divided>
+                    <span style="font-weight: 600; color: #606266">{{ t('proof.undoByCategory') }}</span>
+                  </el-dropdown-item>
+                  <el-dropdown-item
+                    v-for="cat in appliedCategories"
+                    :key="'undo-' + cat.value"
+                    @click="undoByCategory(cat.value)"
+                  >
+                    <span class="category-badge" :class="`category-${cat.value.toLowerCase()}`">{{ cat.label }}</span>
+                    <span style="margin-left: 8px">{{ getAppliedCategoryCount(cat.value) }}</span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
 
           <el-tooltip v-if="fileName" :content="fileName" placement="bottom">
@@ -57,14 +57,14 @@
 
           <template v-if="selectRepository.length > 0">
             <el-tag
-              type="success"
-              size="small"
               v-for="item in selectRepository"
               :key="item"
+              type="success"
+              size="small"
               closable
               :disable-transitions="false"
               @close="deleteSelectRepository(item)"
-              >{{ item }}</el-tag
+            >{{ item }}</el-tag
             >
             <el-button type="danger" size="small" text @click="deleteAllSelectRepository">{{
               t('proof.clear')
@@ -104,7 +104,7 @@
 
         <div class="button-group">
           <el-button-group class="select-file-split">
-            <el-button text :loading="isLoading" @click="selectFileWithMainProcessRead" size="default" class="bar-btn">
+            <el-button text :loading="isLoading" size="default" class="bar-btn" @click="selectFileWithMainProcessRead">
               <el-icon><FolderOpened /></el-icon>
               <span>{{ isLoading ? t('proof.loading') : t('proof.selectFile') }}</span>
             </el-button>
@@ -167,105 +167,105 @@
             :type="activeMode === 'format-clone' ? 'warning' : 'default'"
             size="default"
             class="bar-btn"
-            @click="toggleFormatClone"
             :disabled="!form.filePath"
+            @click="toggleFormatClone"
           >
             <el-icon><CopyDocument /></el-icon>
             <span>{{ activeMode === 'format-clone' ? t('proof.formatClone.backToProof') : t('proof.formatClone.title') }}</span>
           </el-button>
 
           <template v-if="activeMode !== 'format-clone'">
-          <span class="toolbar-divider" />
+            <span class="toolbar-divider" />
 
-          <el-select v-model="form.model" :placeholder="t('proof.modePlaceholder')" size="default" class="mode-select bar-select">
-            <el-option :label="t('proof.modeWordError')" value="wordError" />
-            <el-option :label="t('proof.modeComprehensive')" value="ComprehensiveError" />
-            <el-option :label="t('proof.modePolish')" value="polish" />
-            <el-option :label="t('proof.modeReduceAI')" value="reduceAI" />
-          </el-select>
+            <el-select v-model="form.model" :placeholder="t('proof.modePlaceholder')" size="default" class="mode-select bar-select">
+              <el-option :label="t('proof.modeWordError')" value="wordError" />
+              <el-option :label="t('proof.modeComprehensive')" value="ComprehensiveError" />
+              <el-option :label="t('proof.modePolish')" value="polish" />
+              <el-option :label="t('proof.modeReduceAI')" value="reduceAI" />
+            </el-select>
 
-          <!-- 校对粒度：仅拆分式校对类型可选（polish/reduceAI 固定整篇处理） -->
-          <el-select
-            v-if="form.model === 'wordError' || form.model === 'ComprehensiveError'"
-            v-model="form.proofMode"
-            :placeholder="t('proof.proofMode.label')"
-            size="default"
-            class="proofmode-select bar-select"
-          >
-            <el-option :label="t('proof.proofMode.auto')" value="" />
-            <el-option :label="t('proof.proofMode.full')" value="full" />
-            <el-option :label="t('proof.proofMode.section')" value="section" />
-            <el-option :label="t('proof.proofMode.sentence')" value="sentence" />
-          </el-select>
+            <!-- 校对粒度：仅拆分式校对类型可选（polish/reduceAI 固定整篇处理） -->
+            <el-select
+              v-if="form.model === 'wordError' || form.model === 'ComprehensiveError'"
+              v-model="form.proofMode"
+              :placeholder="t('proof.proofMode.label')"
+              size="default"
+              class="proofmode-select bar-select"
+            >
+              <el-option :label="t('proof.proofMode.auto')" value="" />
+              <el-option :label="t('proof.proofMode.full')" value="full" />
+              <el-option :label="t('proof.proofMode.section')" value="section" />
+              <el-option :label="t('proof.proofMode.sentence')" value="sentence" />
+            </el-select>
 
-          <el-dropdown placement="bottom" popper-class="kb-dropdown-popper">
+            <el-dropdown placement="bottom" popper-class="kb-dropdown-popper">
+              <el-button
+                text
+                size="default"
+                :class="['kb-button', selectRepository.length > 0 ? 'kb-button-active' : '']"
+                :title="t('proof.selectKnowledge')"
+              >
+                <el-icon><Collection /></el-icon>
+                <span v-if="selectRepository.length > 0" class="kb-count-badge">{{ selectRepository.length }}</span>
+              </el-button>
+              <template #dropdown>
+                <div class="kb-dropdown">
+                  <div class="kb-dropdown-header">
+                    <span class="kb-dropdown-title">
+                      <el-icon class="kb-dropdown-title-icon"><Collection /></el-icon>
+                      {{ t('proof.selectKnowledge') }}
+                    </span>
+                    <span v-if="selectRepository.length > 0" class="kb-dropdown-selected-count">
+                      {{ t('proof.kbSelectedCount', { count: selectRepository.length }) }}
+                    </span>
+                  </div>
+                  <div class="kb-dropdown-list">
+                    <div
+                      v-for="value in repositoryList"
+                      :key="value"
+                      class="kb-dropdown-option"
+                      :class="{ 'is-selected': selectRepository.includes(value) }"
+                      @click="addRepository(value)"
+                    >
+                      <el-icon class="kb-option-check">
+                        <Select v-if="selectRepository.includes(value)" />
+                        <Folder v-else />
+                      </el-icon>
+                      <span class="kb-option-name">{{ value }}</span>
+                    </div>
+                    <div v-if="repositoryList.length === 0" class="kb-dropdown-empty">
+                      {{ t('proof.kbEmpty') }}
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </el-dropdown>
+
             <el-button
               text
+              type="primary"
               size="default"
-              :class="['kb-button', selectRepository.length > 0 ? 'kb-button-active' : '']"
-              :title="t('proof.selectKnowledge')"
+              class="bar-btn bar-btn-strong"
+              :disabled="!form.filePath || processing"
+              :loading="processing"
+              @click="onSubmit"
             >
-              <el-icon><Collection /></el-icon>
-              <span v-if="selectRepository.length > 0" class="kb-count-badge">{{ selectRepository.length }}</span>
+              <el-icon v-if="!processing"><VideoPlay /></el-icon>
+              <span>{{ processing ? t('proof.proofreading') : t('proof.startProof') }}</span>
             </el-button>
-            <template #dropdown>
-              <div class="kb-dropdown">
-                <div class="kb-dropdown-header">
-                  <span class="kb-dropdown-title">
-                    <el-icon class="kb-dropdown-title-icon"><Collection /></el-icon>
-                    {{ t('proof.selectKnowledge') }}
-                  </span>
-                  <span v-if="selectRepository.length > 0" class="kb-dropdown-selected-count">
-                    {{ t('proof.kbSelectedCount', { count: selectRepository.length }) }}
-                  </span>
-                </div>
-                <div class="kb-dropdown-list">
-                  <div
-                    v-for="value in repositoryList"
-                    :key="value"
-                    class="kb-dropdown-option"
-                    :class="{ 'is-selected': selectRepository.includes(value) }"
-                    @click="addRepository(value)"
-                  >
-                    <el-icon class="kb-option-check">
-                      <Select v-if="selectRepository.includes(value)" />
-                      <Folder v-else />
-                    </el-icon>
-                    <span class="kb-option-name">{{ value }}</span>
-                  </div>
-                  <div v-if="repositoryList.length === 0" class="kb-dropdown-empty">
-                    {{ t('proof.kbEmpty') }}
-                  </div>
-                </div>
-              </div>
-            </template>
-          </el-dropdown>
 
-          <el-button
-            text
-            type="primary"
-            size="default"
-            class="bar-btn bar-btn-strong"
-            @click="onSubmit"
-            :disabled="!form.filePath || processing"
-            :loading="processing"
-          >
-            <el-icon v-if="!processing"><VideoPlay /></el-icon>
-            <span>{{ processing ? t('proof.proofreading') : t('proof.startProof') }}</span>
-          </el-button>
-
-          <el-button
-            text
-            type="success"
-            size="default"
-            class="bar-btn"
-            @click="exportToDocx"
-            :disabled="proofreadingResults.length === 0"
-            :loading="exporting"
-          >
-            <el-icon><Download /></el-icon>
-            <span>{{ t('proof.exportResult') }}</span>
-          </el-button>
+            <el-button
+              text
+              type="success"
+              size="default"
+              class="bar-btn"
+              :disabled="proofreadingResults.length === 0"
+              :loading="exporting"
+              @click="exportToDocx"
+            >
+              <el-icon><Download /></el-icon>
+              <span>{{ t('proof.exportResult') }}</span>
+            </el-button>
           </template>
           <!-- Format clone 的开始/导出按钮已移至 FormatClone.vue 内部 -->
           <template v-else>
@@ -431,11 +431,6 @@ const proofreadingResults = computed({
   get: () => fileStore.results,
   set: val => fileStore.setCorrectResult(val)
 })
-const timeLimit =
-  apiSettingsStore.selectedApi.TimeLimit && apiSettingsStore.selectedApi.TimeLimit > 0
-    ? apiSettingsStore.selectedApi.TimeLimit
-    : undefined
-
 const form = ref({
   model: fileStore.proofModel,
   filePath: fileStore.filePath,
@@ -696,14 +691,14 @@ watch(
 )
 
 watch(
-  () => form.model,
+  () => form.value.model,
   newVal => {
     if (newVal) fileStore.setProofModel(newVal)
   }
 )
 
 watch(
-  () => form.filePath,
+  () => form.value.filePath,
   newVal => {
     if (newVal) fileStore.setFilePath(newVal)
   }
@@ -1133,7 +1128,7 @@ const onSubmit = async () => {
     error.value = t('proof.errors.selectMode')
     return
   }
-  fileStore.setProofModel(form.model)
+  fileStore.setProofModel(form.value.model)
 
   try {
     processing.value = true
@@ -1334,7 +1329,8 @@ const onSubmit = async () => {
 }
 
 const initCorrectStatus = async () => {
-  if (!fileStore.isfilePathEmpty) {
+  // getter 原误写为 isfilePathEmpty（恒为 undefined→条件恒真），修正为按「已选文件」判断回填
+  if (!fileStore.isFilePathEmpty) {
     form.value.filePath = fileStore.getFilePath
   }
   if (!fileStore.isProofModelEmpty) {

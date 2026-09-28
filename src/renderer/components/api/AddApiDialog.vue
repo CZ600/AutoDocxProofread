@@ -1,10 +1,10 @@
 <template>
   <el-dialog
     :model-value="visible"
-    @update:model-value="handleDialogVisibilityChange"
     :title="dialogTitle"
     width="550px"
     class="api-dialog"
+    @update:model-value="handleDialogVisibilityChange"
   >
     <template #header>
       <div class="dialog-header">
@@ -14,7 +14,7 @@
     </template>
     <el-form ref="formRef" :model="formData" :rules="formRules" label-position="top" class="dialog-form">
       <el-form-item :label="t('addApiDialog.providerLabel')" class="form-item">
-        <el-select v-model="formData.provider" @change="handleProviderChange" class="w-full">
+        <el-select v-model="formData.provider" class="w-full" @change="handleProviderChange">
           <el-option
             v-for="provider in providerOptions"
             :key="provider.id"
@@ -56,7 +56,7 @@
         <el-button @click="handleReset">{{ t('addApiDialog.reset') }}</el-button>
         <el-button @click="handleClose">{{ t('addApiDialog.cancel') }}</el-button>
         <el-button :loading="testing" @click="handleTest">{{ t('addApiDialog.testConnection') }}</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit" class="btn-primary">
+        <el-button type="primary" :loading="submitting" class="btn-primary" @click="handleSubmit">
           {{ mode === 'edit' ? t('addApiDialog.saveEdit') : t('addApiDialog.save') }}
         </el-button>
       </span>
@@ -89,6 +89,8 @@ const props = withDefaults(
     visible: boolean
     mode?: 'create' | 'edit'
     initialData?: ApiFormData | null
+    /** 保存处理函数：由父组件执行保存并返回是否成功，对话框据此控制 loading 与关闭 */
+    submitHandler?: (data: ApiFormData) => Promise<boolean> | boolean
   }>(),
   {
     mode: 'create',
@@ -227,15 +229,25 @@ const handleClose = () => {
 
 const handleSubmit = async () => {
   if (!(await validateForm())) return
+  const payload: ApiFormData = {
+    id: formData.id,
+    URL: formData.URL,
+    key: formData.key,
+    name: formData.name,
+    provider: formData.provider
+  }
+  // 旧事件模式：emit 是同步的，父组件的异步保存结果无法回传，
+  // loading 会在 emit 后立即复位（假 loading），因此仅在未提供 submitHandler 时兜底
+  if (!props.submitHandler) {
+    emit('submit', payload)
+    return
+  }
   submitting.value = true
   try {
-    emit('submit', {
-      id: formData.id,
-      URL: formData.URL,
-      key: formData.key,
-      name: formData.name,
-      provider: formData.provider
-    })
+    const success = await props.submitHandler(payload)
+    if (success) {
+      handleDialogVisibilityChange(false)
+    }
   } finally {
     submitting.value = false
   }

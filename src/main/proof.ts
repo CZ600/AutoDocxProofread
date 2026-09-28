@@ -4,7 +4,7 @@ const { loadDocx } = require('docx-edit')
 import { OpenaiGen, getModelResponse, OnChunk } from './chat'
 import path from 'path'
 import { app } from 'electron'
-import { queryDocuments, getAllDocuments } from './lancedb'
+import { queryDocuments } from './lancedb'
 import { error } from 'console'
 import { ProofreadProgressPayload, ProofreadStreamPayload, ProofreadStreamStage } from '../shared/proofreadProgress'
 import {
@@ -1344,7 +1344,7 @@ export async function proofreadDocument(
   apiURL: string,
   repositoryNameList?: string[],
   embeddingConfig?: ApiSettings,
-  parallelSet: number = 30,
+  parallelSet = 30,
   setTimeLimit?: number,
   onProgress?: (payload: ProofreadProgressPayload) => void,
   provider?: ModelProvider,
@@ -1358,8 +1358,8 @@ export async function proofreadDocument(
   let total_tokens = 0 // calculate the usage of tokens
   const option = setTimeLimit // set the limit of request per minute
     ? {
-        requestsPerMinute: setTimeLimit
-      }
+      requestsPerMinute: setTimeLimit
+    }
     : undefined
 
   try {
@@ -1481,7 +1481,7 @@ export async function proofreadDocument(
         }
       )
       cancelToken?.throwIfCancelled()
-      let resultList: ProofreadingCorrection[][] = []
+      const resultList: ProofreadingCorrection[][] = []
       sectionResults.forEach(item => {
         total_tokens += item.use_tokens
         resultList.push(item.result)
@@ -1562,7 +1562,7 @@ export async function proofreadDocument(
           }
         })
         cancelToken?.throwIfCancelled()
-        let resultList: ProofreadingCorrection[][] = []
+        const resultList: ProofreadingCorrection[][] = []
         sentenceResults.forEach(Items => {
           total_tokens += Items.use_tokens
           resultList.push(Items.result)
@@ -1692,7 +1692,7 @@ export async function reduceAIDetectionDocument(
   apiKey: string,
   modelName: string,
   apiURL: string,
-  parallelSet: number = 30,
+  parallelSet = 30,
   setTimeLimit?: number,
   onProgress?: (payload: ProofreadProgressPayload) => void,
   provider?: ModelProvider,
@@ -1779,7 +1779,7 @@ export async function reduceAIDetectionDocument(
       message: reduceProgress.reducing
     })
 
-      const results = await runWithLimits(
+    const results = await runWithLimits(
       validParagraphs,
       parallelSet,
       async (para, index) => {
@@ -1927,7 +1927,7 @@ export async function reviewCorrections(
       batches.push(corrections.slice(i, i + REVIEW_BATCH_SIZE))
     }
 
-    let allReviewed: ProofreadingCorrection[] = []
+    const allReviewed: ProofreadingCorrection[] = []
     for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
       cancelToken?.throwIfCancelled()
       const batch = batches[batchIdx]

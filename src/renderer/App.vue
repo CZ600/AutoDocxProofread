@@ -64,7 +64,7 @@
         <div class="top-toolbar"></div>
         <div class="content-row">
           <main class="function-panel">
-            <FormatClone v-if="activeMode === 'format-clone'" ref="formatCloneRef" @back="activeMode = 'proof'" />
+            <FormatClone v-if="activeMode === 'format-clone'" ref="formatCloneRef" />
             <router-view v-else />
           </main>
           <section class="preview-panel">
@@ -77,7 +77,6 @@
 </template>
 
 <script setup>
-import './assets/css/common.css'
 import { computed, ref, provide, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { HomeFilled, InfoFilled, Setting, Clock, Collection, Sunny, Moon } from '@element-plus/icons-vue'

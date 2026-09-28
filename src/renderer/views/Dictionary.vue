@@ -10,9 +10,9 @@
         v-model="selectform.id"
         :placeholder="t('dictionary.selectApiModel')"
         class="api-select"
-        @change="handleApiChange"
         size="small"
         style="margin-bottom: 12px; width: 100%"
+        @change="handleApiChange"
       >
         <el-option v-for="item in apiSettings" :key="item.id" :label="item.modelName" :value="item.id">
           <div class="api-option">
@@ -29,7 +29,7 @@
           @click="handleSelect(item)"
         >
           <span class="repo-name">{{ item }}</span>
-          <el-button size="small" :icon="Delete" circle @click.stop="deleteSelectRepository(item)" class="delete-btn" />
+          <el-button size="small" :icon="Delete" circle class="delete-btn" @click.stop="deleteSelectRepository(item)" />
         </div>
 
         <div v-if="repositoryList.length === 0" class="empty-state">
@@ -43,10 +43,10 @@
       </el-button>
     </div>
 
-    <div class="panel-section detail-section" v-if="activeIndex">
+    <div v-if="activeIndex" class="panel-section detail-section">
       <div class="section-header">
         <span>{{ t('dictionary.currentRepo', { name: activeIndex }) }}</span>
-        <el-button size="small" :icon="FolderAdd" @click="addFile" class="btn-success">
+        <el-button size="small" :icon="FolderAdd" class="btn-success" @click="addFile">
           {{ t('dictionary.addFile') }}
         </el-button>
       </div>
@@ -57,7 +57,7 @@
         </el-table-column>
         <el-table-column :label="t('dictionary.operations')" width="70">
           <template #default="{ row }">
-            <el-button size="small" @click.stop="deleteFile(row)" class="btn-danger-sm">
+            <el-button size="small" class="btn-danger-sm" @click.stop="deleteFile(row)">
               {{ t('dictionary.delete') }}
             </el-button>
           </template>
@@ -65,7 +65,7 @@
       </el-table>
     </div>
 
-    <div class="panel-section welcome-section" v-else>
+    <div v-else class="panel-section welcome-section">
       <el-empty :description="t('dictionary.welcomeHint')" :image-size="50" />
     </div>
   </div>
@@ -77,8 +77,8 @@
     :close-on-click-modal="false"
     class="morandi-dialog"
   >
-    <el-form :model="form" label-width="120px">
-      <el-form-item :label="t('dictionary.addRepoDialog.nameLabel')" required>
+    <el-form ref="repoFormRef" :model="form" :rules="repoFormRules" label-width="120px">
+      <el-form-item :label="t('dictionary.addRepoDialog.nameLabel')" prop="repositoryName" required>
         <el-input
           v-model="form.repositoryName"
           :placeholder="t('dictionary.addRepoDialog.namePlaceholder')"
@@ -89,7 +89,7 @@
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="dialogFormVisible = false">{{ t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="addRepositoryWindow" :loading="submitting">
+        <el-button type="primary" :loading="submitting" @click="addRepositoryWindow">
           {{ t('common.confirm') }}
         </el-button>
       </div>
@@ -104,6 +104,7 @@ import { useI18n } from 'vue-i18n'
 import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useRepositoryStore } from '../stores/repositoryStore'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { FormInstance, FormRules } from 'element-plus'
 
 const { t } = useI18n()
 
@@ -123,6 +124,14 @@ const form = reactive({
   apiKey: '',
   apiURL: ''
 })
+
+// 知识库名称校验：对齐 AddApiDialog 的 el-form rules 风格（computed 保持语言切换后文案更新），空名/纯空白拦截
+const repoFormRef = ref<FormInstance>()
+const repoFormRules = computed<FormRules>(() => ({
+  repositoryName: [
+    { required: true, whitespace: true, message: t('dictionary.messages.pleaseInputName'), trigger: 'blur' }
+  ]
+}))
 
 const apiSettings = reactive<any[]>([])
 const selectform = ref({
@@ -211,15 +220,15 @@ const addRepositoryWindow = async () => {
 
   const config = fileStore.getAPIConfig
 
-  if (!form.repositoryName.trim()) {
-    ElMessage.error(t('dictionary.messages.pleaseInputName'))
-    return
+  if (repoFormRef.value) {
+    const valid = await repoFormRef.value.validate().catch(() => false)
+    if (!valid) return
   }
 
   submitting.value = true
   try {
     await electronAPI.createRepository({
-      repositoryName: form.repositoryName,
+      repositoryName: form.repositoryName.trim(),
       modelName: config.modelName,
       apiKey: config.apiKey,
       apiURL: config.apiURL

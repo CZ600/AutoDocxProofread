@@ -7,7 +7,7 @@
         <!-- Reference doc selector -->
         <div class="input-row">
           <span class="input-label">📄 {{ t('proof.formatClone.refDocLabel') }}</span>
-          <el-button size="small" @click="selectRefFile" :loading="selectingRef">
+          <el-button size="small" :loading="selectingRef" @click="selectRefFile">
             {{ t('proof.formatClone.selectRef') }}
           </el-button>
           <template v-if="refFileName">
@@ -23,7 +23,7 @@
         <!-- Description file selector -->
         <div class="input-row">
           <span class="input-label">📝 {{ t('proof.formatClone.descLabel') }}</span>
-          <el-button size="small" @click="selectDescFile" :loading="selectingDescFile">
+          <el-button size="small" :loading="selectingDescFile" @click="selectDescFile">
             {{ t('proof.formatFromDesc.selectFile') }}
           </el-button>
           <template v-if="descFileName">
@@ -38,9 +38,9 @@
 
         <!-- Description textarea: always visible, expand when no results -->
         <textarea
+          v-model="descText"
           class="desc-textarea"
           :class="{ expand: formatItems.length === 0 && defaults === null }"
-          v-model="descText"
           :placeholder="t('proof.formatFromDesc.placeholder')"
           rows="4"
           :readonly="formatItems.length > 0 || defaults !== null"
@@ -52,9 +52,9 @@
             <el-button
               type="primary"
               size="small"
-              @click="startFormat"
               :loading="analyzing"
               :disabled="!targetFilePath || (!refFilePath && !descText.trim())"
+              @click="startFormat"
             >
               {{ analyzing ? t('proof.formatClone.analyzing') : t('proof.formatClone.startAnalyze') }}
             </el-button>
@@ -436,8 +436,6 @@ import { useApiStore } from '../stores/apiStore'
 import { fileInfoStore } from '../stores/store'
 import { renderAsync } from 'docx-preview'
 import { applyPreviewPerfHints } from '../utils/previewPerf'
-
-const emit = defineEmits(['back'])
 
 const electronAPI = window.electronAPI
 const apiStore = useApiStore()

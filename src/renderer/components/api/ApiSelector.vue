@@ -42,10 +42,10 @@
         </el-select>
       </el-form-item>
       <div class="button-group">
-        <el-button type="primary" :icon="Plus" @click="handleAdd" class="btn-add">
+        <el-button type="primary" :icon="Plus" class="btn-add" @click="handleAdd">
           {{ t('apiSelector.addNewAPI') }}
         </el-button>
-        <el-button :icon="Connection" @click="handleTest" class="btn-test">
+        <el-button :icon="Connection" :loading="testing" class="btn-test" @click="handleTest">
           {{ t('apiSelector.testConnection') }}
         </el-button>
       </div>
@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { Delete, Edit, Connection, Plus, Cpu, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
@@ -70,7 +71,9 @@ interface ApiSettingItem {
   provider: ModelProvider
 }
 
-const { selectedApi, apiSettings, deleteApi, maskApiKey } = useApiSettings()
+const { selectedApi, apiSettings, deleteApi, maskApiKey, testApi } = useApiSettings()
+
+const testing = ref(false)
 
 const emit = defineEmits<{
   'add-api': []
@@ -115,8 +118,14 @@ const handleDelete = async (item: ApiSettingItem) => {
   deleteApi(item.id)
 }
 
-const handleTest = () => {
-  testApi()
+const handleTest = async () => {
+  if (testing.value) return
+  testing.value = true
+  try {
+    await testApi()
+  } finally {
+    testing.value = false
+  }
 }
 </script>
 

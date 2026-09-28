@@ -59,7 +59,7 @@ export interface ProxySettings {
   port: number
 }
 
-let api_info: apiSettings = {
+const api_info: apiSettings = {
   apiURL: '',
   apiKey: '',
   modelName: '',
@@ -69,14 +69,13 @@ let api_info: apiSettings = {
 }
 
 // 全局代理设置
-let proxy_settings: ProxySettings = {
+const proxy_settings: ProxySettings = {
   enabled: false,
   port: 33210
 }
 
 const PROOFREAD_PROGRESS_CHANNEL = 'proofread-progress'
 const PROOFREAD_STREAM_CHANNEL = 'proofread-stream'
-const PROOFREAD_CANCEL_CHANNEL = 'proofread-cancel'
 
 // 活跃校对任务的取消令牌：runId → token。
 // 渲染端发起校对时生成 runId 一并传入，取消时按 runId 精确中止对应任务
@@ -292,7 +291,7 @@ export const registerIpcHandlers = () => {
       repositoryNameList?: string[],
       embeddingConfig?: apiSettings,
       setTimeLimit?: number,
-      parallelSet: number = 30,
+      parallelSet = 30,
       reviewModelId?: number | null,
       runId?: string,
       proofMode?: string
@@ -303,6 +302,12 @@ export const registerIpcHandlers = () => {
       // 取消令牌：注册进全局表供 cancelProofread 查找，结束时移除
       const cancelToken = createProofreadCancelToken()
       if (runId) activeProofreadTokens.set(runId, cancelToken)
+      // 未知校对模式兜底：必须放在 try 之前抛出（外层 catch 会把错误吞成空结果），
+      // 让渲染端收到 IPC 拒绝并走统一错误提示，而不是拿到 undefined/空结果。
+      // 空值仍由 try 内的参数校验给出更友好的提示
+      if (Model && Model !== 'wordError' && Model !== 'ComprehensiveError' && Model !== 'polish' && Model !== 'reduceAI') {
+        throw new Error(`Unknown proofread mode: ${Model}`)
+      }
       try {
         const sendProgress = (payload: ProofreadProgressPayload) => {
           event.sender.send(PROOFREAD_PROGRESS_CHANNEL, payload)
@@ -825,13 +830,15 @@ export const registerIpcHandlers = () => {
   })
   // 历史记录 - 根据id查询记录
   ipcMain.handle('getHistoryById', async (event, id) => {
-    if (id) {
-      const result = await DB.getHistoryById(id)
-      if (result) {
-        return result
-      } else {
-        throw new Error('No history found by id: ${id}')
-      }
+    // 空 id 提前返回 null（调用方按可空处理），避免带着空参查库
+    if (!id) {
+      return null
+    }
+    const result = await DB.getHistoryById(id)
+    if (result) {
+      return result
+    } else {
+      throw new Error(`No history found by id: ${id}`)
     }
   })
 
