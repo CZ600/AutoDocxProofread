@@ -57,7 +57,9 @@
       "reviewing": "正在审核校对结果",
       "reducing": "正在降低AI率",
       "completed": "校对完成",
-      "default": "正在校对"
+      "default": "正在校对",
+      "cancel": "取消",
+      "cancelling": "正在取消…"
     },
     "correctionTypes": {
       "Typo": "错别字",
@@ -102,7 +104,8 @@
       "ignored": "已忽略该条建议，可随时取消忽略",
       "unignored": "已恢复该条建议",
       "editSaved": "修改建议已更新",
-      "editEmpty": "建议内容不能为空"
+      "editEmpty": "建议内容不能为空",
+      "proofCancelled": "校对已取消"
     },
     "formatClone": {
       "title": "格式克隆",
@@ -135,7 +138,19 @@
     "editedTag": "已编辑",
     "editSuggested": "编辑建议内容",
     "saveEdit": "保存",
-    "cancelEdit": "取消"
+    "cancelEdit": "取消",
+    "stream": {
+      "charsReceived": "已接收 {count} 字",
+      "suggestions": "完成，{count} 处建议",
+      "segmentClean": "完成，无修改"
+    },
+    "proofMode": {
+      "label": "校对粒度",
+      "auto": "默认",
+      "full": "整篇",
+      "section": "分段",
+      "sentence": "逐句"
+    }
   },
   "apiSettings": {
     "tabAPI": "API设置",

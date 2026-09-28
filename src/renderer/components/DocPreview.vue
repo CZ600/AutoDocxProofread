@@ -7,7 +7,7 @@
         <div class="file-info-container">
           <template v-if="activeMode !== 'format-clone'">
           <el-dropdown placement="bottom" trigger="click" :disabled="proofreadingResults.length === 0">
-            <el-button type="primary" size="default" class="apply-changes-btn">
+            <el-button text type="primary" size="default" class="bar-btn apply-changes-btn" :title="t('proof.applyChanges')">
               <span>{{ t('proof.applyChanges') }}</span>
               <el-icon><ArrowDown /></el-icon>
             </el-button>
@@ -15,7 +15,7 @@
               <el-dropdown-menu>
                 <el-dropdown-item @click="applyALLCorrection()">
                   <el-icon style="margin-right: 8px"><Select /></el-icon>
-                  {{ t('proof.applyAllCount', { count: proofreadingResults.filter(r => !r.applied).length }) }}
+                  {{ t('proof.applyAllCount', { count: proofreadingResults.filter(r => !r.applied && !r.rejected).length }) }}
                 </el-dropdown-item>
                 <el-dropdown-item divided>
                   <span style="font-weight: 600; color: #606266">{{ t('proof.applyByCategory') }}</span>
@@ -74,22 +74,39 @@
 
         <transition name="inline-progress-fade">
           <div v-if="progressDialogVisible" class="inline-progress-container">
-            <span class="inline-progress-stage">{{ progressStageText }}</span>
+            <div class="inline-progress-ticker">
+              <transition name="ticker-slide" mode="out-in">
+                <span :key="tickerLine" class="inline-progress-line" :title="tickerLine">{{ tickerLine }}</span>
+              </transition>
+            </div>
             <el-progress
               class="inline-progress-bar"
-              :percentage="progressPercent"
+              :percentage="progressIndeterminate ? 50 : progressPercent"
+              :indeterminate="progressIndeterminate"
+              :duration="3"
               :show-text="false"
               :stroke-width="8"
               :color="progressBarColor"
             />
-            <span class="inline-progress-percent">{{ progressPercent }}%</span>
+            <span v-if="!progressIndeterminate" class="inline-progress-percent">{{ progressPercent }}%</span>
+            <el-button
+              v-if="!cancelRequested"
+              class="inline-progress-cancel"
+              size="small"
+              text
+              @click="cancelCurrentProofread"
+            >
+              {{ t('proof.progress.cancel') }}
+            </el-button>
+            <span v-else class="inline-progress-cancelling">{{ t('proof.progress.cancelling') }}</span>
           </div>
         </transition>
 
         <div class="button-group">
           <el-button-group class="select-file-split">
-            <el-button type="primary" :loading="isLoading" @click="selectFileWithMainProcessRead" size="default">
-              {{ isLoading ? t('proof.loading') : t('proof.selectFile') }}
+            <el-button text :loading="isLoading" @click="selectFileWithMainProcessRead" size="default" class="bar-btn">
+              <el-icon><FolderOpened /></el-icon>
+              <span>{{ isLoading ? t('proof.loading') : t('proof.selectFile') }}</span>
             </el-button>
             <el-dropdown
               placement="bottom-end"
@@ -97,9 +114,9 @@
               popper-class="recent-files-dropdown-popper"
             >
               <el-button
-                type="primary"
+                text
                 size="default"
-                class="select-file-split-trigger"
+                class="bar-btn select-file-split-trigger"
                 :title="t('recentFiles.title')"
               >
                 <el-icon><ArrowDown /></el-icon>
@@ -143,27 +160,50 @@
             </el-dropdown>
           </el-button-group>
 
+          <span class="toolbar-divider" />
+
           <el-button
+            text
             :type="activeMode === 'format-clone' ? 'warning' : 'default'"
             size="default"
+            class="bar-btn"
             @click="toggleFormatClone"
             :disabled="!form.filePath"
           >
-            {{ activeMode === 'format-clone' ? t('proof.formatClone.backToProof') : t('proof.formatClone.title') }}
+            <el-icon><CopyDocument /></el-icon>
+            <span>{{ activeMode === 'format-clone' ? t('proof.formatClone.backToProof') : t('proof.formatClone.title') }}</span>
           </el-button>
 
           <template v-if="activeMode !== 'format-clone'">
-          <el-select v-model="form.model" :placeholder="t('proof.modePlaceholder')" size="default" class="mode-select">
+          <span class="toolbar-divider" />
+
+          <el-select v-model="form.model" :placeholder="t('proof.modePlaceholder')" size="default" class="mode-select bar-select">
             <el-option :label="t('proof.modeWordError')" value="wordError" />
             <el-option :label="t('proof.modeComprehensive')" value="ComprehensiveError" />
             <el-option :label="t('proof.modePolish')" value="polish" />
             <el-option :label="t('proof.modeReduceAI')" value="reduceAI" />
           </el-select>
 
+          <!-- 校对粒度：仅拆分式校对类型可选（polish/reduceAI 固定整篇处理） -->
+          <el-select
+            v-if="form.model === 'wordError' || form.model === 'ComprehensiveError'"
+            v-model="form.proofMode"
+            :placeholder="t('proof.proofMode.label')"
+            size="default"
+            class="proofmode-select bar-select"
+          >
+            <el-option :label="t('proof.proofMode.auto')" value="" />
+            <el-option :label="t('proof.proofMode.full')" value="full" />
+            <el-option :label="t('proof.proofMode.section')" value="section" />
+            <el-option :label="t('proof.proofMode.sentence')" value="sentence" />
+          </el-select>
+
           <el-dropdown placement="bottom" popper-class="kb-dropdown-popper">
             <el-button
+              text
               size="default"
               :class="['kb-button', selectRepository.length > 0 ? 'kb-button-active' : '']"
+              :title="t('proof.selectKnowledge')"
             >
               <el-icon><Collection /></el-icon>
               <span v-if="selectRepository.length > 0" class="kb-count-badge">{{ selectRepository.length }}</span>
@@ -202,29 +242,62 @@
           </el-dropdown>
 
           <el-button
+            text
             type="primary"
             size="default"
+            class="bar-btn bar-btn-strong"
             @click="onSubmit"
             :disabled="!form.filePath || processing"
             :loading="processing"
           >
-            {{ processing ? t('proof.proofreading') : t('proof.startProof') }}
+            <el-icon v-if="!processing"><VideoPlay /></el-icon>
+            <span>{{ processing ? t('proof.proofreading') : t('proof.startProof') }}</span>
           </el-button>
 
           <el-button
+            text
             type="success"
             size="default"
+            class="bar-btn"
             @click="exportToDocx"
             :disabled="proofreadingResults.length === 0"
             :loading="exporting"
           >
-            {{ t('proof.exportResult') }}
+            <el-icon><Download /></el-icon>
+            <span>{{ t('proof.exportResult') }}</span>
           </el-button>
           </template>
           <!-- Format clone 的开始/导出按钮已移至 FormatClone.vue 内部 -->
           <template v-else>
           </template>
         </div>
+      </div>
+
+      <!-- 自定义窗口控制按钮：融入 action-bar 右端，替代原生悬浮按钮 -->
+      <div class="window-controls">
+        <button class="win-btn" :title="t('app.window.minimize')" @click="minimizeWindow">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <path d="M0 5 H10" stroke="currentColor" stroke-width="1" />
+          </svg>
+        </button>
+        <button
+          class="win-btn"
+          :title="isMaximized ? t('app.window.restore') : t('app.window.maximize')"
+          @click="toggleMaximizeWindow"
+        >
+          <svg v-if="isMaximized" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <rect x="0.5" y="2.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1" />
+            <path d="M2.5 2.5 V0.5 H9.5 V7.5 H7.5" fill="none" stroke="currentColor" stroke-width="1" />
+          </svg>
+          <svg v-else width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <rect x="0.5" y="0.5" width="9" height="9" fill="none" stroke="currentColor" stroke-width="1" />
+          </svg>
+        </button>
+        <button class="win-btn win-btn-close" :title="t('app.window.close')" @click="closeWindow">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+            <path d="M0.5 0.5 L9.5 9.5 M9.5 0.5 L0.5 9.5" stroke="currentColor" stroke-width="1" />
+          </svg>
+        </button>
       </div>
     </div>
 
@@ -285,9 +358,21 @@ import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useRepositoryStore } from '../stores/repositoryStore'
 import { useApiStore } from '../stores/apiStore'
 import { useRecentFilesStore, formatRelativeTime } from '../stores/recentFilesStore'
-import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files } from '@element-plus/icons-vue'
+import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download } from '@element-plus/icons-vue'
 import { useDark } from '@vueuse/core'
 import { requiresBaseURL } from '../../shared/modelProviders'
+import {
+  applyCorrectionsToPreview,
+  clearHighlights,
+  getDomPositionFromIndex,
+  locateCorrectionsInPreview,
+  undoCorrectionsInPreview
+} from '../utils/correctionMatching'
+import { applyPreviewPerfHints } from '../utils/previewPerf'
+import { useWindowControls } from '../composables/useWindowControls'
+
+// ---- 自定义窗口控制按钮（action-bar 右上角，与工具栏融为一体）----
+const { isMaximized, minimizeWindow, toggleMaximizeWindow, closeWindow } = useWindowControls()
 
 const electronAPI = window.electronAPI
 const router = useRouter()
@@ -304,18 +389,37 @@ const exporting = ref(false)
 const progressDialogVisible = ref(false)
 const progressPercent = ref(0)
 const progressStage = ref('splitting')
-const progressMode = ref('real')
 const progressDetail = ref('')
+// 单次大请求模式（polish）没有可靠的百分比数据，进度条以流动动画表达进行中
+const progressIndeterminate = ref(false)
 const progressBarColor = [
   { color: '#d8ebff', percentage: 30 },
   { color: '#b7dcff', percentage: 70 },
   { color: '#8ec5ff', percentage: 100 }
 ]
-let fakeProgressTimer = null
 let closeProgressTimer = null
 let proofreadProgressUnsubscribe = null
+let proofreadStreamUnsubscribe = null
 let cachedDocxFile = null
 let skipWatcherRerender = false
+
+// ---- 流式输出明细（整合进顶部进度条，与状态行滚动交替显示） ----
+const streamTotalChars = ref(0)
+// 最近一个完成的分段：{ stage, label, count }
+const latestSegment = ref(null)
+// 交替显示开关：false=原有状态行，true=流式详细信息行
+const tickerShowDetail = ref(false)
+let tickerTimer = null
+
+// ---- 校对取消 ----
+const cancelRequested = ref(false)
+let currentRunId = ''
+
+const cancelCurrentProofread = () => {
+  if (!processing.value || cancelRequested.value) return
+  cancelRequested.value = true
+  electronAPI.cancelProofread(currentRunId)
+}
 
 const fileStore = fileInfoStore()
 const apiSettingsStore = useApiStore()
@@ -334,7 +438,9 @@ const timeLimit =
 
 const form = ref({
   model: fileStore.proofModel,
-  filePath: fileStore.filePath
+  filePath: fileStore.filePath,
+  // 校对粒度：'' = 默认（wordError 按句、综合按段）；仅 wordError/ComprehensiveError 可调
+  proofMode: ''
 })
 
 const progressStageText = computed(() => {
@@ -359,176 +465,8 @@ const normalizeCorrectionType = type => {
   return (type || '').toString().trim().toLowerCase()
 }
 
-const FOOTNOTE_PLACEHOLDER_RE = /\[\[FOOTNOTE_REF:\d+\]\]/g
-const MATH_PLACEHOLDER_RE = /\[\[MATH:[\s\S]*?\]\]/g
-
-const stripFootnotePlaceholders = text => {
-  return stripZeroWidth(text.replace(FOOTNOTE_PLACEHOLDER_RE, '').replace(MATH_PLACEHOLDER_RE, ''))
-}
-
-/**
- * 零宽字符集：U+200B (零宽空格)、U+200C (零宽非连接符)、
- * U+200D (零宽连接符)、U+FEFF (BOM/零宽不换行空格)。
- *
- * 这些字符肉眼不可见，但会干扰匹配：
- * - docx-edit 抽取公式占位符 [[MATH:...]] 时常把 OMML 边界的零宽字符带进段落文本
- * - JS 的 \s 不包含 U+200B-200D/FEFF，转义时不会被 \s+ 吸收，会被原样烧进正则
- * - docx-preview 渲染 DOM 时通常不保留这些零宽字符
- * 三者叠加会导致带公式的段落匹配静默失败。
- */
-const ZERO_WIDTH_CHARS_RE = /[\u200B-\u200D\uFEFF]/g
-
-/** 剥离所有零宽字符 */
-const stripZeroWidth = text => (text || '').replace(ZERO_WIDTH_CHARS_RE, '')
-
-/**
- * 构建脚注和公式感知的匹配正则。
- * 将 [[FOOTNOTE_REF:x]] 占位符替换为 \d* 通配符，
- * 将 [[MATH:...]] 占位符替换为 .*? 通配符，
- * 使正则能容忍 DOM 中 docx-preview 渲染出的实际内容。
- *
- * 例：original = "文本[[FOOTNOTE_REF:0]]内容[[MATH:C]]结尾"
- *     → 正则 /文本\d*内容.*?结尾/
- *     DOM fullText = "文本1内容C结尾" → 匹配成功 ✓
- */
-const createFootnoteAwareMatcher = (searchText, flags = 'g') => {
-  // 先剥离零宽字符，避免它们被当作字面字符烧进正则。
-  // 这些字符在 docx-preview 渲染的 DOM 中通常不存在，会直接导致匹配失败。
-  const cleanedSearch = stripZeroWidth(searchText)
-  // 先用统一分隔符拆分，同时处理 [[FOOTNOTE_REF:x]] 和 [[MATH:...]]
-  // （[\s\S] 使公式文本含换行时也能拆开）
-  const parts = cleanedSearch.split(/\[\[FOOTNOTE_REF:\d+\]\]|\[\[MATH:[\s\S]*?\]\]/)
-  const escapedParts = parts.map(part =>
-    part
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      // 除常规空白外，也吞掉零宽字符，使正则对它们完全不敏感
-      .replace(/[\s\u200B-\u200D\uFEFF]+/g, '\\s*')
-  )
-
-  // 统计占位符出现顺序，确定每个间隙用什么通配符
-  // （在剥离零宽后的文本上扫描，与上面的 split 保持同一来源）
-  const placeholderPattern = /\[\[FOOTNOTE_REF:\d+\]\]|\[\[MATH:[\s\S]*?\]\]/g
-  const wildcards = []
-  let m
-  while ((m = placeholderPattern.exec(cleanedSearch)) !== null) {
-    if (m[0].startsWith('[[FOOTNOTE_REF:')) {
-      // 脚注引用在 DOM 中渲染为上标数字
-      wildcards.push('\\d*')
-    } else {
-      // 公式渲染为 MathML，其文本内容是 m:t 的拼接——结构分数、上下标等
-      // 元素间常出现空格，必须允许跨空格匹配，否则高亮静默失败
-      wildcards.push('[\\s\\S]*?')
-    }
-  }
-
-  let pattern = ''
-  for (let i = 0; i < escapedParts.length; i++) {
-    pattern += escapedParts[i]
-    if (i < wildcards.length) {
-      pattern += wildcards[i]
-    }
-  }
-
-  if (!pattern) return null
-  return new RegExp(pattern, flags)
-}
-
-const clearHighlights = container => {
-  const existingHighlights = container.querySelectorAll('.highlight-correction')
-  existingHighlights.forEach(el => {
-    const parent = el.parentNode
-    if (!parent) return
-    while (el.firstChild) {
-      parent.insertBefore(el.firstChild, el)
-    }
-    parent.removeChild(el)
-    parent.normalize()
-  })
-}
-
-const buildTextNodeMap = container => {
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
-  const segments = []
-  let fullText = ''
-  let currentOffset = 0
-  let node
-  while ((node = walker.nextNode())) {
-    const text = node.textContent || ''
-    if (!text) continue
-    segments.push({
-      node,
-      start: currentOffset,
-      end: currentOffset + text.length
-    })
-    fullText += text
-    currentOffset += text.length
-  }
-  return { fullText, segments }
-}
-
-const getDomPositionFromIndex = (segments, targetIndex, preferEnd = false) => {
-  if (segments.length === 0) return null
-  if (targetIndex <= 0) {
-    return { node: segments[0].node, offset: 0 }
-  }
-  const lastSegment = segments[segments.length - 1]
-  if (targetIndex >= lastSegment.end) {
-    return {
-      node: lastSegment.node,
-      offset: lastSegment.node.textContent.length
-    }
-  }
-  for (const segment of segments) {
-    if (preferEnd) {
-      if (targetIndex >= segment.start && targetIndex <= segment.end) {
-        return {
-          node: segment.node,
-          offset: Math.min(targetIndex - segment.start, segment.node.textContent.length)
-        }
-      }
-    } else if (targetIndex >= segment.start && targetIndex < segment.end) {
-      return {
-        node: segment.node,
-        offset: targetIndex - segment.start
-      }
-    }
-  }
-  return null
-}
-
-const rangesOverlap = (left, right) => !(left.end <= right.start || left.start >= right.end)
-
-const locateCorrectionsInPreview = (container, corrections) => {
-  const { fullText, segments } = buildTextNodeMap(container)
-  const occupiedRanges = []
-  const matches = []
-  corrections.forEach(({ item, index }) => {
-    const originalText = item.original?.trim() || ''
-    if (!originalText) return
-    const regex = createFootnoteAwareMatcher(originalText)
-    if (!regex) return
-    let match
-    while ((match = regex.exec(fullText))) {
-      const start = match.index
-      const end = start + match[0].length
-      const range = { start, end }
-      if (!occupiedRanges.some(existing => rangesOverlap(existing, range))) {
-        occupiedRanges.push(range)
-        matches.push({
-          index,
-          item,
-          start,
-          end
-        })
-        break
-      }
-      if (match[0].length === 0) {
-        regex.lastIndex += 1
-      }
-    }
-  })
-  return { matches, segments }
-}
+// 文本定位/高亮/替换的通用逻辑统一在 utils/correctionMatching.js 维护，
+// 与 Proof.vue 左侧列表共用同一套匹配口径（含重复文本按出现次序分配的约定）
 
 const highlightCorrections = () => {
   const container = previewContainer.value
@@ -536,7 +474,7 @@ const highlightCorrections = () => {
   clearHighlights(container)
   const pendingCorrections = proofreadingResults.value
     .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !item.applied)
+    .filter(({ item }) => !item.applied && !item.rejected)
   if (pendingCorrections.length === 0) return
   const { matches, segments } = locateCorrectionsInPreview(container, pendingCorrections)
   matches
@@ -559,25 +497,6 @@ const highlightCorrections = () => {
       highlightEl.appendChild(range.extractContents())
       range.insertNode(highlightEl)
     })
-}
-
-const replaceCorrectionInPreview = (container, correction) => {
-  clearHighlights(container)
-  const { matches, segments } = locateCorrectionsInPreview(container, [{ item: correction, index: 0 }])
-  const match = matches[0]
-  if (!match) return false
-  const startPos = getDomPositionFromIndex(segments, match.start, false)
-  const endPos = getDomPositionFromIndex(segments, match.end, true)
-  if (!startPos || !endPos) return false
-  const range = document.createRange()
-  range.setStart(startPos.node, startPos.offset)
-  range.setEnd(endPos.node, endPos.offset)
-  range.deleteContents()
-  // suggested 中的 [[FOOTNOTE_REF:x]] 在 DOM 中不存在，需要 strip
-  const suggestedForDOM = stripFootnotePlaceholders(correction.suggested || '')
-  range.insertNode(document.createTextNode(suggestedForDOM))
-  container.normalize()
-  return true
 }
 
 const formatCorrectionType = type => {
@@ -607,7 +526,7 @@ const availableCategories = computed(() => {
   }
   const types = new Set()
   proofreadingResults.value.forEach(item => {
-    if (!item.applied && item.type) {
+    if (!item.applied && !item.rejected && item.type) {
       types.add(item.type)
     }
   })
@@ -618,17 +537,22 @@ const availableCategories = computed(() => {
 })
 
 const getCategoryCount = type => {
-  const count = proofreadingResults.value.filter(item => !item.applied && item.type === type).length
+  const count = proofreadingResults.value.filter(item => !item.applied && !item.rejected && item.type === type).length
   return t('proof.messages.countItems', { count })
 }
 
 const applyByCategory = type => {
-  const applicableResults = proofreadingResults.value.filter(item => !item.applied && item.type === type)
+  const applicableResults = proofreadingResults.value.filter(item => !item.applied && !item.rejected && item.type === type)
   if (applicableResults.length === 0) {
     ElMessage.warning(t('proof.messages.noPendingInCategory'))
     return
   }
   skipWatcherRerender = true
+  // 在改动 store 前先取出目标项及其在结果列表中的下标，
+  // 供 applyCorrectionsToPreview 按"结果顺序=文档顺序"分配重复文本的出现位置
+  const targetList = proofreadingResults.value
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !item.applied && !item.rejected && item.type === type)
   const newResults = proofreadingResults.value.map(item => {
     if (!item.applied && item.type === type) {
       return { ...item, applied: true }
@@ -639,43 +563,35 @@ const applyByCategory = type => {
   skipWatcherRerender = false
   const container = previewContainer.value
   if (!container) return
-  let replacedCount = 0
-  applicableResults.forEach(item => {
-    if (replaceCorrectionInPreview(container, { ...item, applied: true })) {
-      replacedCount += 1
-    }
-  })
+  const replacedCount = applyCorrectionsToPreview(container, targetList)
   highlightCorrections()
   const typeLabel = formatCorrectionType(type)
   if (replacedCount === applicableResults.length) {
-    ElMessage.success(t('proof.messages.appliedAllType', { typeLabel }))
+    ElMessage.success(t('proof.messages.appliedAllOfType', { typeLabel }))
   } else {
     ElMessage.warning(
-      t('proof.messages.appliedPartialType', { replaced: replacedCount, total: applicableResults.length, typeLabel })
+      t('proof.messages.appliedPartialOfType', { replaced: replacedCount, total: applicableResults.length, typeLabel })
     )
   }
 }
 
 const applyALLCorrection = () => {
-  const applicableResults = proofreadingResults.value.filter(item => !item.applied)
+  const applicableResults = proofreadingResults.value.filter(item => !item.applied && !item.rejected)
   if (applicableResults.length === 0) {
     ElMessage.warning(t('proof.messages.noPendingChanges'))
     return
   }
   skipWatcherRerender = true
+  const targetList = proofreadingResults.value
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !item.applied && !item.rejected)
   const newResults = proofreadingResults.value.map(item => ({ ...item, applied: true }))
   proofreadingResults.value = newResults
   skipWatcherRerender = false
   const container = previewContainer.value
   if (!container) return
-  clearHighlights(container)
-  let replacedCount = 0
-  applicableResults.forEach(item => {
-    if (replaceCorrectionInPreview(container, { ...item, applied: true })) {
-      replacedCount += 1
-    }
-  })
-  if (replacedCount === applicableResults.length) {
+  const replacedCount = applyCorrectionsToPreview(container, targetList)
+  if (replacedCount === targetList.length) {
     ElMessage.success(t('proof.messages.appliedAll'))
   } else {
     ElMessage.warning(t('proof.messages.appliedPartial', { replaced: replacedCount, total: applicableResults.length }))
@@ -687,10 +603,12 @@ const rerenderAndReapply = async () => {
   await renderDocx(cachedDocxFile)
   const container = previewContainer.value
   if (!container) return
-  const appliedCorrections = proofreadingResults.value.filter(item => item.applied)
-  appliedCorrections.forEach(item => {
-    replaceCorrectionInPreview(container, item)
-  })
+  // 重新渲染后一次性重放全部已应用替换：单次定位保证重复文本
+  // 各归其位，不会因重复原文而反复替换第一处
+  const appliedCorrections = proofreadingResults.value
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.applied)
+  applyCorrectionsToPreview(container, appliedCorrections)
   highlightCorrections()
 }
 
@@ -728,7 +646,11 @@ const undoByCategory = async type => {
     ElMessage.warning(t('proof.messages.noAppliedChanges'))
     return
   }
-  skipWatcherRerender = true
+  // 原位撤销：把建议文本替换回原文，避免整篇重渲染
+  const container = previewContainer.value
+  const appliedItems = proofreadingResults.value.filter(item => item.applied)
+  const undone = container ? undoCorrectionsInPreview(container, appliedItems, appliedResults) : 0
+  fileStore.requestSkipResultRerender()
   const newResults = proofreadingResults.value.map(item => {
     if (item.applied && item.type === type) {
       return { ...item, applied: false }
@@ -736,9 +658,12 @@ const undoByCategory = async type => {
     return item
   })
   proofreadingResults.value = newResults
-  skipWatcherRerender = false
-  await rerenderAndReapply()
-  const typeLabel = formatCorrectionType(type)
+  if (undone !== appliedResults.length) {
+    // 原位撤销不完整（定位失败等），整篇重渲染并重放剩余已应用项兜底
+    await rerenderAndReapply()
+  } else {
+    highlightCorrections()
+  }
   ElMessage.success(t('proof.messages.undoAllSuccess'))
 }
 
@@ -748,11 +673,18 @@ const undoAllCorrections = async () => {
     ElMessage.warning(t('proof.messages.noAppliedChanges'))
     return
   }
-  skipWatcherRerender = true
+  // 原位撤销：把建议文本替换回原文，避免整篇重渲染
+  const container = previewContainer.value
+  const appliedItems = proofreadingResults.value.filter(item => item.applied)
+  const undone = container ? undoCorrectionsInPreview(container, appliedItems, appliedResults) : 0
+  fileStore.requestSkipResultRerender()
   const newResults = proofreadingResults.value.map(item => ({ ...item, applied: false }))
   proofreadingResults.value = newResults
-  skipWatcherRerender = false
-  await rerenderAndReapply()
+  if (undone !== appliedResults.length) {
+    await rerenderAndReapply()
+  } else {
+    highlightCorrections()
+  }
   ElMessage.success(t('proof.messages.undoAllSuccess'))
 }
 
@@ -859,13 +791,6 @@ const pushToDB = async resultCorrect => {
   }
 }
 
-const clearFakeProgressTimer = () => {
-  if (fakeProgressTimer) {
-    clearInterval(fakeProgressTimer)
-    fakeProgressTimer = null
-  }
-}
-
 const clearCloseProgressTimer = () => {
   if (closeProgressTimer) {
     clearTimeout(closeProgressTimer)
@@ -873,24 +798,49 @@ const clearCloseProgressTimer = () => {
   }
 }
 
+const stopTicker = () => {
+  if (tickerTimer) {
+    clearInterval(tickerTimer)
+    tickerTimer = null
+  }
+  tickerShowDetail.value = false
+}
+
+const startTicker = () => {
+  stopTicker()
+  // 原有状态行与流式详细信息行每 3.5 秒上下滚动交替一次；
+  // 详细信息为空时 computed 会自动回落到状态行，不产生视觉变化
+  tickerTimer = setInterval(() => {
+    if (!progressDialogVisible.value || !processing.value) return
+    if (detailLine.value) {
+      tickerShowDetail.value = !tickerShowDetail.value
+    }
+  }, 3500)
+}
+
 const resetProgressState = () => {
-  clearFakeProgressTimer()
   clearCloseProgressTimer()
+  stopTicker()
   progressPercent.value = 0
   progressStage.value = 'splitting'
   progressDetail.value = ''
-  progressMode.value = 'real'
+  progressIndeterminate.value = false
+  streamTotalChars.value = 0
+  latestSegment.value = null
+  cancelRequested.value = false
 }
 
 const openProgressDialog = mode => {
   resetProgressState()
   progressDialogVisible.value = true
-  progressMode.value = mode === 'polish' ? 'fake' : 'real'
+  // polish 模式是单次全文请求，主进程没有分段进度，改用流动进度条 + 流式接收字数
+  progressIndeterminate.value = mode === 'polish'
+  startTicker()
 }
 
 const closeProgressDialog = () => {
-  clearFakeProgressTimer()
   clearCloseProgressTimer()
+  stopTicker()
   closeProgressTimer = setTimeout(() => {
     progressDialogVisible.value = false
     progressDetail.value = ''
@@ -898,29 +848,63 @@ const closeProgressDialog = () => {
   }, 400)
 }
 
-const startFakeProgress = () => {
-  clearFakeProgressTimer()
-  const startTime = Date.now()
-  const duration = 120000
-  fakeProgressTimer = setInterval(() => {
-    const elapsed = Date.now() - startTime
-    const ratio = Math.min(elapsed / duration, 1)
-    const easedRatio = 1 - Math.pow(1 - ratio, 3)
-    const nextPercent = Math.min(95, Math.floor(easedRatio * 95))
-    progressPercent.value = Math.max(progressPercent.value, nextPercent)
-    if (ratio >= 1) {
-      progressPercent.value = 95
-      clearFakeProgressTimer()
-    }
-  }, 120)
-}
-
 const finishProgress = () => {
-  clearFakeProgressTimer()
+  progressIndeterminate.value = false
   progressStage.value = 'completed'
   progressDetail.value = ''
   progressPercent.value = 100
   closeProgressDialog()
+}
+
+// 面板内每个分段行的标签兜底文案
+const stageLabel = stage => {
+  const map = {
+    theme: t('proof.progress.theme'),
+    proofread: t('proof.progress.proofreading'),
+    reduce: t('proof.progress.reducing'),
+    review: t('proof.progress.reviewing')
+  }
+  return map[stage] || stage
+}
+
+// 状态行：原有进度信息（阶段 + 已完成/总数）；取消请求发出后固定显示取消中
+const statusLine = computed(() => {
+  if (cancelRequested.value) return t('proof.progress.cancelling')
+  const parts = [progressStageText.value]
+  if (progressDetail.value) parts.push(progressDetail.value)
+  return parts.join(' ')
+})
+
+// 详细信息行：流式接收字数 + 最近完成的分段
+const detailLine = computed(() => {
+  const parts = []
+  if (streamTotalChars.value > 0) {
+    parts.push(t('proof.stream.charsReceived', { count: streamTotalChars.value }))
+  }
+  if (latestSegment.value) {
+    const seg = latestSegment.value
+    const segText = seg.count > 0 ? t('proof.stream.suggestions', { count: seg.count }) : t('proof.stream.segmentClean')
+    parts.push(`${seg.label || stageLabel(seg.stage)} ${segText}`)
+  }
+  return parts.join(' · ')
+})
+
+// 当前应显示的行：详细信息存在且轮到它时显示详细信息，否则显示状态
+const tickerLine = computed(() =>
+  tickerShowDetail.value && detailLine.value ? detailLine.value : statusLine.value
+)
+
+const handleProofreadStream = payload => {
+  if (!processing.value) return
+  if (payload.kind === 'chunk') {
+    streamTotalChars.value += (payload.text || '').length
+  } else if (payload.kind === 'segment') {
+    latestSegment.value = {
+      stage: payload.stage,
+      label: payload.label || '',
+      count: typeof payload.corrections === 'number' ? payload.corrections : 0
+    }
+  }
 }
 
 const handleProofreadProgress = payload => {
@@ -945,7 +929,7 @@ const handleProofreadProgress = payload => {
   } else {
     progressDetail.value = ''
   }
-  if (progressMode.value === 'real' && typeof payload.percent === 'number') {
+  if (typeof payload.percent === 'number') {
     if (payload.stage === 'completed') {
       progressPercent.value = 100
     } else if (payload.stage === 'reviewing') {
@@ -961,6 +945,8 @@ const renderDocx = async file => {
     if (previewContainer.value) {
       previewContainer.value.innerHTML = ''
       await renderAsync(file, previewContainer.value)
+      // 大文档性能：视口外的页面跳过布局/绘制，滚动到时再实时渲染
+      applyPreviewPerfHints(previewContainer.value)
     } else {
       throw new Error(t('proof.errors.previewNotInit'))
     }
@@ -1155,9 +1141,8 @@ const onSubmit = async () => {
     fileStore.setCorrectResult([])
     openProgressDialog(form.value.model)
     progressStage.value = 'splitting'
-    if (form.value.model === 'polish') {
-      startFakeProgress()
-    }
+    // 本次校对任务的取消标识，cancelProofread 依据它精确中止对应任务
+    currentRunId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     let apiURL, apiKey, modelName, provider, parallel, timeLimit_
     const currentApiSettings = apiSettingsStore.selectedApi
@@ -1185,8 +1170,8 @@ const onSubmit = async () => {
         type: 'error',
         duration: 3000
       })
-      clearFakeProgressTimer()
       clearCloseProgressTimer()
+      stopTicker()
       progressDialogVisible.value = false
       progressDetail.value = ''
       processing.value = false
@@ -1211,8 +1196,23 @@ const onSubmit = async () => {
         { apiURL: embApiURL, apiKey: embApiKey, modelName: embModelName },
         timeLimit_,
         apiSettingsStore.selectedApi.parallel,
-        apiSettingsStore.reviewModelId ?? null
+        apiSettingsStore.reviewModelId ?? null,
+        currentRunId,
+        form.value.proofMode || undefined
       )
+      // 用户取消：主进程中止了在途请求，走取消流程而非报错
+      if (preResult?.cancelled) {
+        clearCloseProgressTimer()
+        stopTicker()
+        progressDialogVisible.value = false
+        progressDetail.value = ''
+        ElMessage({
+          message: t('proof.messages.proofCancelled'),
+          type: 'info',
+          duration: 2500
+        })
+        return
+      }
       if ('message' in preResult) {
         if (preResult.message === 'Please select an API setting!') {
           ElMessage({
@@ -1220,8 +1220,8 @@ const onSubmit = async () => {
             type: 'error',
             duration: 1500
           })
-          clearFakeProgressTimer()
           clearCloseProgressTimer()
+          stopTicker()
           progressDialogVisible.value = false
           progressDetail.value = ''
           return
@@ -1237,8 +1237,23 @@ const onSubmit = async () => {
         undefined,
         timeLimit_,
         apiSettingsStore.selectedApi.parallel,
-        apiSettingsStore.reviewModelId ?? null
+        apiSettingsStore.reviewModelId ?? null,
+        currentRunId,
+        form.value.proofMode || undefined
       )
+      // 用户取消：主进程中止了在途请求，走取消流程而非报错
+      if (preResult?.cancelled) {
+        clearCloseProgressTimer()
+        stopTicker()
+        progressDialogVisible.value = false
+        progressDetail.value = ''
+        ElMessage({
+          message: t('proof.messages.proofCancelled'),
+          type: 'info',
+          duration: 2500
+        })
+        return
+      }
       if ('message' in preResult) {
         if (preResult.message === 'Please select an API setting!') {
           ElMessage({
@@ -1246,8 +1261,8 @@ const onSubmit = async () => {
             type: 'error',
             duration: 1500
           })
-          clearFakeProgressTimer()
           clearCloseProgressTimer()
+          stopTicker()
           progressDialogVisible.value = false
           progressDetail.value = ''
           return
@@ -1292,10 +1307,19 @@ const onSubmit = async () => {
 
     router.push('/proof')
   } catch (err) {
-    clearFakeProgressTimer()
     clearCloseProgressTimer()
+    stopTicker()
     progressDialogVisible.value = false
     progressDetail.value = ''
+    // 取消过程中止在途请求可能以异常形式冒出，统一按已取消处理
+    if (cancelRequested.value) {
+      ElMessage({
+        message: t('proof.messages.proofCancelled'),
+        type: 'info',
+        duration: 2500
+      })
+      return
+    }
     error.value = t('proof.errors.processFailed', { message: err.message })
     console.error('校对处理异常:', err)
     ElMessage({
@@ -1304,7 +1328,7 @@ const onSubmit = async () => {
       duration: 3000
     })
   } finally {
-    clearFakeProgressTimer()
+    // 注意：这里不能清 closeProgressTimer——finishProgress 安排的 400ms 延迟关闭靠它生效
     processing.value = false
   }
 }
@@ -1323,12 +1347,18 @@ const initProofreadProgressListener = () => {
     proofreadProgressUnsubscribe()
   }
   proofreadProgressUnsubscribe = electronAPI.onProofreadProgress(handleProofreadProgress)
+  if (proofreadStreamUnsubscribe) {
+    proofreadStreamUnsubscribe()
+  }
+  proofreadStreamUnsubscribe = electronAPI.onProofreadStream(handleProofreadStream)
 }
 
 watch(
   () => fileStore.results,
   async newResults => {
     if (skipWatcherRerender) return
+    // 撤销等操作已在预览中原位完成文本回退，标记为无需整篇重渲染
+    if (fileStore.consumeSkipResultRerender()) return
     if (newResults.length > 0) {
       // 重新渲染文档再高亮，与重启时 onMounted 行为一致。
       // 直接在旧 DOM 上高亮可能导致含脚注段落的 DOM 结构不一致而匹配失败。
@@ -1367,11 +1397,19 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  clearFakeProgressTimer()
   clearCloseProgressTimer()
+  stopTicker()
+  // 页面在校对进行中被离开/关闭时，主动取消后台仍在运行的任务
+  if (processing.value && currentRunId) {
+    electronAPI.cancelProofread(currentRunId)
+  }
   if (proofreadProgressUnsubscribe) {
     proofreadProgressUnsubscribe()
     proofreadProgressUnsubscribe = null
+  }
+  if (proofreadStreamUnsubscribe) {
+    proofreadStreamUnsubscribe()
+    proofreadStreamUnsubscribe = null
   }
 })
 </script>
@@ -1380,6 +1418,15 @@ onUnmounted(() => {
 html.dark .action-bar {
   background-color: #1d1e1f;
   border-bottom-color: #2c2e30;
+}
+
+/* 顶栏分隔线 / 下拉框 hover：暗色适配 */
+html.dark .toolbar-divider {
+  background-color: #4c4d4f;
+}
+
+html.dark .bar-select .el-select__wrapper:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 html.dark .file-name-tag {
@@ -1636,17 +1683,16 @@ html.dark .preview-container hr {
   border-color: #2c2e30 !important;
 }
 
-html.dark .inline-progress-container {
-  background: rgba(30, 32, 34, 0.9);
-  border-color: #2c2e30;
-}
-
-html.dark .inline-progress-stage {
+html.dark .inline-progress-line {
   color: #8ec5ff;
 }
 
 html.dark .inline-progress-percent {
   color: #d7e9ff;
+}
+
+html.dark .inline-progress-cancelling {
+  color: #ffcc80;
 }
 
 html.dark .kb-dropdown {
@@ -1695,24 +1741,50 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
 .inline-progress-container {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex: 1;
-  max-width: 400px;
-  min-width: 240px;
-  padding: 6px 16px;
-  border-radius: 8px;
-  background: rgba(240, 245, 255, 0.7);
-  border: 1px solid rgba(142, 197, 255, 0.22);
+  max-width: 560px;
+  min-width: 300px;
   transition: all 0.3s ease;
   -webkit-app-region: no-drag;
 }
 
-.inline-progress-stage {
+/* 状态行与详细信息行的滚动交替显示区：文字右对齐紧贴进度条，
+   变长时向左自然延展，区域宽度上限不变 */
+.inline-progress-ticker {
+  flex: 1;
+  min-width: 90px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.inline-progress-line {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: 12px;
   font-weight: 500;
   color: #5b7c99;
-  white-space: nowrap;
-  flex-shrink: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+
+.ticker-slide-enter-active,
+.ticker-slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.ticker-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.ticker-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 
 .inline-progress-bar {
@@ -1728,6 +1800,23 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
   flex-shrink: 0;
   min-width: 36px;
   text-align: right;
+}
+
+.inline-progress-cancel {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.inline-progress-cancel:hover {
+  color: var(--el-color-danger);
+}
+
+.inline-progress-cancelling {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: #c0762c;
+  white-space: nowrap;
 }
 
 .inline-progress-fade-enter-active {
@@ -1883,11 +1972,70 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
   right: 0;
   height: 52px;
   padding: 0 20px;
-  padding-right: 146px;
+  padding-right: 158px; /* 右端留给自定义窗口控制按钮（3×46px + 间距） */
   background-color: #fff;
   border-bottom: 1px solid #e4e7ed;
   z-index: 99;
   -webkit-app-region: drag;
+}
+
+/* 自定义窗口控制按钮：嵌入 action-bar 右端（替代原生悬浮按钮，可点击、悬停变色） */
+.window-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  display: flex;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  width: 46px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #807e85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.win-btn:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+  color: #44444a;
+}
+
+.win-btn:active {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #44444a;
+}
+
+.win-btn-close:hover {
+  background-color: #e81123;
+  color: #ffffff;
+}
+
+.win-btn-close:active {
+  background-color: #c50f1f;
+  color: #ffffff;
+}
+
+html.dark .win-btn {
+  color: #a7a7ad;
+}
+
+html.dark .win-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #e0e0e5;
+}
+
+html.dark .win-btn:active {
+  background-color: rgba(255, 255, 255, 0.13);
+  color: #e0e0e5;
 }
 
 .header-content {
@@ -1917,10 +2065,42 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
 
 .button-group {
   display: flex;
-  gap: 8px;
+  gap: 4px;
   align-items: center;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
+}
+
+/* ---- 顶栏无边框紧凑按钮：图标+文字，hover 以浅底反馈替代描边 ---- */
+.bar-btn {
+  height: 30px;
+  padding: 0 8px;
+  margin-left: 0 !important;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bar-btn .el-icon {
+  font-size: 15px;
+}
+
+/* 主要操作（开始校正）用主题色文字加重，与普通文字按钮区分 */
+.bar-btn-strong {
+  font-weight: 600;
+}
+
+.bar-btn-strong .el-icon {
+  font-size: 16px;
+}
+
+/* 分组之间的细分隔线（参照 Office 网页版顶栏） */
+.toolbar-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background-color: #dcdfe6;
+  flex-shrink: 0;
 }
 
 .file-info-container .el-tag,
@@ -1928,13 +2108,35 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
   -webkit-app-region: no-drag;
 }
 
-.mode-select {
-  width: 150px;
+/* ---- 顶栏下拉框：去边框去底色，宽度随内容自适应（消除文字与箭头间的空白） ---- */
+.bar-select {
+  --el-select-width: fit-content;
+  min-width: 96px;
+  max-width: 150px;
+}
+
+.bar-select :deep(.el-select__wrapper) {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 8px;
+  font-size: 13px;
+  border-radius: 6px;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.bar-select :deep(.el-select__wrapper:hover) {
+  background-color: rgba(0, 0, 0, 0.045);
+}
+
+.bar-select :deep(.el-select__wrapper.is-focused) {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
 }
 
 .kb-button {
   position: relative;
-  padding: 8px 10px;
+  height: 30px;
+  padding: 0 8px;
   transition: all 0.2s ease;
 }
 
@@ -1961,6 +2163,7 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
 }
 
 .preview-area {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1985,12 +2188,17 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
   align-items: stretch;
 }
 
+/* 主按钮右缘与箭头触发器贴紧，缩小文字与箭头间距 */
+.select-file-split :deep(.el-button:first-child) {
+  padding-right: 4px;
+}
+
 .select-file-split :deep(.el-button) {
   margin-left: 0 !important;
 }
 
 .select-file-split-trigger {
-  padding: 0 10px;
+  padding: 0 5px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

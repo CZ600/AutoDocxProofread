@@ -57,7 +57,9 @@
       "reviewing": "Reviewing proofreading results",
       "reducing": "Reducing AI detection rate",
       "completed": "Proofreading completed",
-      "default": "Proofreading"
+      "default": "Proofreading",
+      "cancel": "Cancel",
+      "cancelling": "Cancelling…"
     },
     "correctionTypes": {
       "Typo": "Typo",
@@ -102,7 +104,8 @@
       "ignored": "Suggestion ignored, you can unignore it anytime",
       "unignored": "Suggestion restored",
       "editSaved": "Suggestion updated",
-      "editEmpty": "Suggestion text cannot be empty"
+      "editEmpty": "Suggestion text cannot be empty",
+      "proofCancelled": "Proofreading canceled"
     },
     "formatClone": {
       "title": "Format Clone",
@@ -135,7 +138,19 @@
     "editedTag": "Edited",
     "editSuggested": "Edit suggested text",
     "saveEdit": "Save",
-    "cancelEdit": "Cancel"
+    "cancelEdit": "Cancel",
+    "stream": {
+      "charsReceived": "{count} chars received",
+      "suggestions": "Done, {count} suggestions",
+      "segmentClean": "Done, no changes"
+    },
+    "proofMode": {
+      "label": "Granularity",
+      "auto": "Default",
+      "full": "Whole document",
+      "section": "By section",
+      "sentence": "By sentence"
+    }
   },
   "apiSettings": {
     "tabAPI": "API Settings",
