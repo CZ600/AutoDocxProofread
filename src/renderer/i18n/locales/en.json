@@ -175,7 +175,8 @@
       "charsReceived": "{count} chars received",
       "suggestions": "Done, {count} suggestions",
       "segmentClean": "Done, no changes",
-      "thinking": "Thinking"
+      "thinking": "Thinking",
+      "noThinking": "Thinking enabled, but no reasoning received (model/provider may not support it)"
     },
     "proofMode": {
       "label": "Granularity",

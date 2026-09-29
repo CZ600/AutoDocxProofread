@@ -669,10 +669,11 @@ export async function getDoubaoResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://ark.cn-beijing.volces.com/api/v3'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 3. 阿里云 (通义千问 Qwen) ======================
@@ -685,10 +686,11 @@ export async function getQwenResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 4. 腾讯云 (混元 Hunyuan) ======================
@@ -701,10 +703,11 @@ export async function getHunyuanResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://api.hunyuan.cloud.tencent.com/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 5. 百度云 (文心一言 ERNIE / 千帆) ======================
@@ -717,10 +720,11 @@ export async function getErnieResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://qianfan.baidubce.com/v2'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 6. GLM (智谱AI ChatGLM) ======================
@@ -733,10 +737,11 @@ export async function getGLMResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://open.bigmodel.cn/api/paas/v4'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 7. Minimax ======================
@@ -749,10 +754,11 @@ export async function getMinimaxResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://api.minimax.io/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 8. Kimi (Moonshot AI) ======================
@@ -765,10 +771,11 @@ export async function getKimiResponse(
   apiKey: string,
   modelName: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const apiURL = 'https://api.moonshot.cn/v1'
-  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====================== 9. 模拟 Claude Code ======================
@@ -945,25 +952,25 @@ export async function getModelResponse(
       return await getGeminiResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)
 
     case ModelProvider.DOUBAO:
-      return await getDoubaoResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getDoubaoResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.QWEN:
-      return await getQwenResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getQwenResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.HUNYUAN:
-      return await getHunyuanResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getHunyuanResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.ERNIE:
-      return await getErnieResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getErnieResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.GLM:
-      return await getGLMResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getGLMResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.MINIMAX:
-      return await getMinimaxResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getMinimaxResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.KIMI:
-      return await getKimiResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal)
+      return await getKimiResponse(systemPrompt, userPrompt, apiKey, modelName, onChunk, signal, onThinking)
 
     case ModelProvider.CLAUDE_CODE:
       return await getClaudeCodeResponse(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)

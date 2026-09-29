@@ -399,11 +399,14 @@ const progressDetail = ref('')
 // 思考内容：append 思维链增量，超长时仅保留尾部；
 // 展示上直接替换进度条旁的信息位（thinkingTail 取最新一段，随增量到达持续滚动）
 const thinkingText = ref('')
+// 收到的思维链总字符数：用于「已开启思考但未收到思维链」的界面自诊断
+const thinkingChars = ref(0)
 const THINKING_DISPLAY_MAX_CHARS = 4000
 const THINKING_TAIL_CHARS = 160
 
 const appendThinkingText = text => {
   if (!text) return
+  thinkingChars.value += text.length
   thinkingText.value = (thinkingText.value + text).slice(-THINKING_DISPLAY_MAX_CHARS)
 }
 
@@ -847,6 +850,7 @@ const resetProgressState = () => {
   latestSegment.value = null
   cancelRequested.value = false
   thinkingText.value = ''
+  thinkingChars.value = 0
 }
 
 const openProgressDialog = mode => {
@@ -899,6 +903,10 @@ const detailLine = computed(() => {
   const parts = []
   if (streamTotalChars.value > 0) {
     parts.push(t('proof.stream.charsReceived', { count: streamTotalChars.value }))
+  }
+  // 自诊断：思考档位开启、服务端已有正文输出、但思维链为 0 字 → 服务端未返回 reasoning
+  if (thinkingChars.value === 0 && streamTotalChars.value > 0 && (apiSettingsStore.selectedApi.thinkingMode || 'default') === 'enabled') {
+    parts.push(t('proof.stream.noThinking'))
   }
   if (latestSegment.value) {
     const seg = latestSegment.value
