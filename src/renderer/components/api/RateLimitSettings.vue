@@ -26,6 +26,20 @@
         :max="500"
         class="custom-slider"
       />
+
+      <div class="timeout-row">
+        <span class="timeout-label">{{ t('rateLimit.timeoutLabel') }}</span>
+        <el-input-number
+          :model-value="requestTimeoutSec ?? 300"
+          :min="5"
+          :max="3600"
+          :step="5"
+          controls-position="right"
+          class="timeout-input"
+          @update:model-value="handleTimeoutChange"
+        />
+        <span class="timeout-hint">{{ t('rateLimit.timeoutHint') }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -36,7 +50,8 @@ import { Timer, InfoFilled } from '@element-plus/icons-vue'
 import { useApiSettings } from '../../composables/useApiSettings'
 
 const { t } = useI18n()
-const { openTimeLimit, timeLimit, toggleTimeLimit, updateTimeLimit } = useApiSettings()
+const { openTimeLimit, timeLimit, requestTimeoutSec, toggleTimeLimit, updateTimeLimit, updateRequestTimeout } =
+  useApiSettings()
 
 const handleToggleLimit = () => {
   toggleTimeLimit()
@@ -44,6 +59,11 @@ const handleToggleLimit = () => {
 
 const handleTimeLimitChange = (value: number) => {
   updateTimeLimit(value)
+}
+
+const handleTimeoutChange = (value: number | undefined) => {
+  // 输入被清空时恢复默认（null → 主进程 300s 默认值）
+  updateRequestTimeout(typeof value === 'number' ? value : null)
 }
 </script>
 
@@ -119,6 +139,29 @@ const handleTimeLimitChange = (value: number) => {
 .custom-slider {
   margin: 16px 0;
   padding: 10px;
+}
+
+.timeout-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.timeout-label {
+  font-size: 13px;
+  color: #5b7c99;
+  font-weight: 500;
+}
+
+.timeout-input {
+  width: 130px;
+}
+
+.timeout-hint {
+  font-size: 12px;
+  color: #9aa7b4;
 }
 
 .custom-slider :deep(.el-slider__runway) {
@@ -201,5 +244,13 @@ html.dark .custom-slider :deep(.el-slider__runway) {
 
 html.dark .custom-slider :deep(.el-slider__button) {
   border-color: #1a1a1a;
+}
+
+html.dark .timeout-label {
+  color: #8a8a8a;
+}
+
+html.dark .timeout-hint {
+  color: #6f6f6f;
 }
 </style>

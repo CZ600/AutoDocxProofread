@@ -3,7 +3,8 @@ import { dialog } from 'electron'
 import * as path from 'path'
 import { DB } from './database'
 import { maskKey } from './apiKeyCrypto'
-import { testAPI, testAPIWithProvider } from './chat'
+import { testAPI, testAPIWithProvider, setRequestTimeoutMs } from './chat'
+import { shouldRunReview } from './reviewGate'
 import { ModelProvider, getProviderBaseURL, requiresBaseURL } from '../shared/modelProviders'
 import {
   proofreadDocument,
@@ -52,7 +53,10 @@ export interface apiSettings {
   modelName: string
   provider?: ModelProvider
   parallel?: number
-  TimeLimit?: number | null
+  /** 每分钟最大请求数（速率限制），null 表示不限 */
+  requestsPerMinute?: number | null
+  /** 单请求超时（秒），null 表示使用 chat.ts 的默认值 */
+  requestTimeoutSec?: number | null
 }
 
 export interface ProxySettings {
@@ -66,7 +70,21 @@ const api_info: apiSettings = {
   modelName: '',
   provider: ModelProvider.OPENAI_COMPATIBLE,
   parallel: 30,
-  TimeLimit: null
+  requestsPerMinute: null,
+  requestTimeoutSec: null
+}
+
+// 解析审核阶段使用的模型：显式选择了审核模型则用之（查库失败回退校对模型），否则用校对模型
+const resolveReviewApiInfo = async (
+  reviewModelId?: number | null
+): Promise<{ apiKey: string; apiURL: string; modelName: string; provider?: ModelProvider }> => {
+  if (reviewModelId != null) {
+    const reviewApi = await DB.getAPISettingById(reviewModelId)
+    if (reviewApi) {
+      return { apiKey: reviewApi.apiKey, apiURL: reviewApi.apiURL, modelName: reviewApi.modelName, provider: reviewApi.provider }
+    }
+  }
+  return { apiKey: api_info.apiKey, apiURL: api_info.apiURL, modelName: api_info.modelName, provider: api_info.provider }
 }
 
 // 全局代理设置
@@ -258,14 +276,25 @@ export const registerIpcHandlers = () => {
 
   ipcMain.handle(
     'selectAPISetting',
-    async (event, URL, Key, modelName, parallel = 30, TimeLimit = null, provider = ModelProvider.OPENAI_COMPATIBLE) => {
+    async (
+      event,
+      URL,
+      Key,
+      modelName,
+      parallel = 30,
+      requestsPerMinute = null,
+      provider = ModelProvider.OPENAI_COMPATIBLE,
+      requestTimeoutSec = null
+    ) => {
       api_info.apiKey = Key
       api_info.apiURL = URL
       api_info.modelName = modelName
       api_info.provider = provider
       api_info.parallel = parallel
-      api_info.TimeLimit = TimeLimit
-      console.log('Selected API:', URL, maskKey(Key), modelName, parallel, TimeLimit, provider)
+      // 历史参数名 TimeLimit 实际语义是「每分钟请求数上限」，已按语义更名
+      api_info.requestsPerMinute = requestsPerMinute
+      api_info.requestTimeoutSec = requestTimeoutSec
+      console.log('Selected API:', URL, maskKey(Key), modelName, parallel, requestsPerMinute, provider, requestTimeoutSec)
       return true
     }
   )
@@ -277,7 +306,8 @@ export const registerIpcHandlers = () => {
       modelName: api_info.modelName,
       provider: api_info.provider,
       parallel: api_info.parallel || 30,
-      TimeLimit: api_info.TimeLimit
+      requestsPerMinute: api_info.requestsPerMinute,
+      requestTimeoutSec: api_info.requestTimeoutSec
     }
   })
 
@@ -291,11 +321,12 @@ export const registerIpcHandlers = () => {
       filePath,
       repositoryNameList?: string[],
       embeddingConfig?: apiSettings,
-      setTimeLimit?: number,
+      requestsPerMinute?: number,
       parallelSet = 30,
       reviewModelId?: number | null,
       runId?: string,
-      proofMode?: string
+      proofMode?: string,
+      reviewEnabled?: boolean
     ) => {
       // 流式输出：LLM 增量文本与分段完成事件经独立通道推送渲染端。
       // 声明在 try 外，finally 中需要访问并刷出缓冲
@@ -324,7 +355,9 @@ export const registerIpcHandlers = () => {
         console.info('Processing settings:', Model, filePath)
         console.info('embedding settings:', repositoryNameList, embeddingConfig ? { ...embeddingConfig, apiKey: maskKey(embeddingConfig.apiKey) } : embeddingConfig)
         console.info('the parallel set is:', parallelSet)
-        console.info('the time limit of process is:', setTimeLimit)
+        console.info('requests per minute limit is:', requestsPerMinute)
+        // 单请求超时（秒→毫秒）：透传给 chat.ts 的客户端构造，null 恢复默认
+        setRequestTimeoutMs(api_info.requestTimeoutSec != null ? api_info.requestTimeoutSec * 1000 : null)
 
         if (!Model || !filePath) {
           return {
@@ -348,7 +381,7 @@ export const registerIpcHandlers = () => {
         }
         if (Model === 'wordError') {
           console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
-          let { proofResult, token_usage } = await proofreadDocument(
+          const proofreadOutcome = await proofreadDocument(
             filePath,
             resolveProofMode(Model, proofMode),
             api_info.apiKey,
@@ -357,25 +390,19 @@ export const registerIpcHandlers = () => {
             repositoryNameList,
             embeddingConfig,
             parallelSet,
-            setTimeLimit,
+            requestsPerMinute,
             sendProgress,
             api_info.provider,
             streamSink,
             cancelToken
           )
+          let { proofResult, token_usage } = proofreadOutcome
+          const { failedSegments } = proofreadOutcome
 
-          // 自动审核校对结果
-          let reviewApiInfo: { apiKey: string; apiURL: string; modelName: string; provider?: ModelProvider } | null = null
-          if (reviewModelId) {
-            const reviewApi = await DB.getAPISettingById(reviewModelId)
-            if (reviewApi) {
-              reviewApiInfo = { apiKey: reviewApi.apiKey, apiURL: reviewApi.apiURL, modelName: reviewApi.modelName, provider: reviewApi.provider }
-            }
-          }
-          if (!reviewApiInfo && api_info) {
-            reviewApiInfo = { apiKey: api_info.apiKey, apiURL: api_info.apiURL, modelName: api_info.modelName, provider: api_info.provider }
-          }
-          if (reviewApiInfo && proofResult && proofResult.length > 0) {
+          // 自动审核校对结果：默认关闭，仅在显式选择审核模型或开启「结果复核」开关时执行。
+          // 审核失败不丢弃已完成的校对结果——保留未过滤结果并把失败记入 failedSegments。
+          if (proofResult && proofResult.length > 0 && shouldRunReview(reviewModelId, reviewEnabled)) {
+            const reviewApiInfo = await resolveReviewApiInfo(reviewModelId)
             sendProgress({
               stage: 'reviewing',
               mode: 'sentence',
@@ -384,35 +411,47 @@ export const registerIpcHandlers = () => {
               percent: 95,
               message: '正在审核校对结果'
             })
-            const backgroundInstruction = getCurrentBackgroundInstruction()
-            const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
-              proofResult,
-              backgroundInstruction,
-              reviewApiInfo.apiKey,
-              reviewApiInfo.modelName,
-              reviewApiInfo.apiURL,
-              (completed, total) => {
-                sendProgress({
-                  stage: 'reviewing',
-                  mode: 'sentence',
-                  total,
-                  completed,
-                  percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
-                  message: '正在审核校对结果'
-                })
-              },
-              reviewApiInfo.provider,
-              streamSink,
-              cancelToken
-            )
-            proofResult = reviewedResult
-            token_usage += reviewTokens
+            try {
+              const backgroundInstruction = getCurrentBackgroundInstruction()
+              const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
+                proofResult,
+                backgroundInstruction,
+                reviewApiInfo.apiKey,
+                reviewApiInfo.modelName,
+                reviewApiInfo.apiURL,
+                (completed, total) => {
+                  sendProgress({
+                    stage: 'reviewing',
+                    mode: 'sentence',
+                    total,
+                    completed,
+                    percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
+                    message: '正在审核校对结果'
+                  })
+                },
+                reviewApiInfo.provider,
+                streamSink,
+                cancelToken
+              )
+              proofResult = reviewedResult
+              token_usage += reviewTokens
+            } catch (reviewError) {
+              if (cancelToken.cancelled) throw reviewError
+              console.error('审核校对结果失败，保留未过滤结果继续:', reviewError)
+              failedSegments.push({
+                stage: 'review',
+                index: 0,
+                label: 'review',
+                message: reviewError instanceof Error ? reviewError.message : String(reviewError)
+              })
+            }
           }
           // 确保返回的数据是可克隆的
           try {
             const result = {
               proofResult: JSON.parse(JSON.stringify(proofResult)),
-              token_usage: token_usage
+              token_usage: token_usage,
+              failedSegments
             }
             return result
           } catch (error) {
@@ -424,7 +463,7 @@ export const registerIpcHandlers = () => {
           }
         } else if (Model === 'ComprehensiveError') {
           console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
-          let { proofResult, token_usage } = await proofreadDocument(
+          const proofreadOutcome = await proofreadDocument(
             filePath,
             resolveProofMode(Model, proofMode),
             api_info.apiKey,
@@ -433,25 +472,19 @@ export const registerIpcHandlers = () => {
             repositoryNameList,
             embeddingConfig,
             parallelSet,
-            setTimeLimit,
+            requestsPerMinute,
             sendProgress,
             api_info.provider,
             streamSink,
             cancelToken
           )
+          let { proofResult, token_usage } = proofreadOutcome
+          const { failedSegments } = proofreadOutcome
 
-          // 自动审核校对结果
-          let reviewApiInfo2: { apiKey: string; apiURL: string; modelName: string; provider?: ModelProvider } | null = null
-          if (reviewModelId) {
-            const reviewApi = await DB.getAPISettingById(reviewModelId)
-            if (reviewApi) {
-              reviewApiInfo2 = { apiKey: reviewApi.apiKey, apiURL: reviewApi.apiURL, modelName: reviewApi.modelName, provider: reviewApi.provider }
-            }
-          }
-          if (!reviewApiInfo2 && api_info) {
-            reviewApiInfo2 = { apiKey: api_info.apiKey, apiURL: api_info.apiURL, modelName: api_info.modelName, provider: api_info.provider }
-          }
-          if (reviewApiInfo2 && proofResult && proofResult.length > 0) {
+          // 自动审核校对结果：默认关闭，仅在显式选择审核模型或开启「结果复核」开关时执行。
+          // 审核失败不丢弃已完成的校对结果——保留未过滤结果并把失败记入 failedSegments。
+          if (proofResult && proofResult.length > 0 && shouldRunReview(reviewModelId, reviewEnabled)) {
+            const reviewApiInfo = await resolveReviewApiInfo(reviewModelId)
             sendProgress({
               stage: 'reviewing',
               mode: 'section',
@@ -460,35 +493,47 @@ export const registerIpcHandlers = () => {
               percent: 95,
               message: '正在审核校对结果'
             })
-            const backgroundInstruction = getCurrentBackgroundInstruction()
-            const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
-              proofResult,
-              backgroundInstruction,
-              reviewApiInfo2.apiKey,
-              reviewApiInfo2.modelName,
-              reviewApiInfo2.apiURL,
-              (completed, total) => {
-                sendProgress({
-                  stage: 'reviewing',
-                  mode: 'section',
-                  total,
-                  completed,
-                  percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
-                  message: '正在审核校对结果'
-                })
-              },
-              reviewApiInfo2.provider,
-              streamSink,
-              cancelToken
-            )
-            proofResult = reviewedResult
-            token_usage += reviewTokens
+            try {
+              const backgroundInstruction = getCurrentBackgroundInstruction()
+              const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
+                proofResult,
+                backgroundInstruction,
+                reviewApiInfo.apiKey,
+                reviewApiInfo.modelName,
+                reviewApiInfo.apiURL,
+                (completed, total) => {
+                  sendProgress({
+                    stage: 'reviewing',
+                    mode: 'section',
+                    total,
+                    completed,
+                    percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
+                    message: '正在审核校对结果'
+                  })
+                },
+                reviewApiInfo.provider,
+                streamSink,
+                cancelToken
+              )
+              proofResult = reviewedResult
+              token_usage += reviewTokens
+            } catch (reviewError) {
+              if (cancelToken.cancelled) throw reviewError
+              console.error('审核校对结果失败，保留未过滤结果继续:', reviewError)
+              failedSegments.push({
+                stage: 'review',
+                index: 0,
+                label: 'review',
+                message: reviewError instanceof Error ? reviewError.message : String(reviewError)
+              })
+            }
           }
           // 确保返回的数据是可克隆的
           try {
             const result = {
               proofResult: JSON.parse(JSON.stringify(proofResult)),
-              token_usage: token_usage
+              token_usage: token_usage,
+              failedSegments
             }
             return result
           } catch (error) {
@@ -500,7 +545,7 @@ export const registerIpcHandlers = () => {
           }
         } else if (Model === 'polish') {
           console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
-          let { proofResult, token_usage } = await proofreadDocument(
+          const proofreadOutcome = await proofreadDocument(
             filePath,
             'full',
             api_info.apiKey,
@@ -509,25 +554,19 @@ export const registerIpcHandlers = () => {
             repositoryNameList,
             embeddingConfig,
             parallelSet,
-            setTimeLimit,
+            requestsPerMinute,
             sendProgress,
             api_info.provider,
             streamSink,
             cancelToken
           )
+          let { proofResult, token_usage } = proofreadOutcome
+          const { failedSegments } = proofreadOutcome
 
-          // 自动审核校对结果
-          let reviewApiInfo3: { apiKey: string; apiURL: string; modelName: string; provider?: ModelProvider } | null = null
-          if (reviewModelId) {
-            const reviewApi = await DB.getAPISettingById(reviewModelId)
-            if (reviewApi) {
-              reviewApiInfo3 = { apiKey: reviewApi.apiKey, apiURL: reviewApi.apiURL, modelName: reviewApi.modelName, provider: reviewApi.provider }
-            }
-          }
-          if (!reviewApiInfo3 && api_info) {
-            reviewApiInfo3 = { apiKey: api_info.apiKey, apiURL: api_info.apiURL, modelName: api_info.modelName, provider: api_info.provider }
-          }
-          if (reviewApiInfo3 && proofResult && proofResult.length > 0) {
+          // 自动审核校对结果：默认关闭，仅在显式选择审核模型或开启「结果复核」开关时执行。
+          // 审核失败不丢弃已完成的校对结果——保留未过滤结果并把失败记入 failedSegments。
+          if (proofResult && proofResult.length > 0 && shouldRunReview(reviewModelId, reviewEnabled)) {
+            const reviewApiInfo = await resolveReviewApiInfo(reviewModelId)
             sendProgress({
               stage: 'reviewing',
               mode: 'full',
@@ -536,35 +575,47 @@ export const registerIpcHandlers = () => {
               percent: 95,
               message: '正在审核校对结果'
             })
-            const backgroundInstruction = getCurrentBackgroundInstruction()
-            const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
-              proofResult,
-              backgroundInstruction,
-              reviewApiInfo3.apiKey,
-              reviewApiInfo3.modelName,
-              reviewApiInfo3.apiURL,
-              (completed, total) => {
-                sendProgress({
-                  stage: 'reviewing',
-                  mode: 'full',
-                  total,
-                  completed,
-                  percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
-                  message: '正在审核校对结果'
-                })
-              },
-              reviewApiInfo3.provider,
-              streamSink,
-              cancelToken
-            )
-            proofResult = reviewedResult
-            token_usage += reviewTokens
+            try {
+              const backgroundInstruction = getCurrentBackgroundInstruction()
+              const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
+                proofResult,
+                backgroundInstruction,
+                reviewApiInfo.apiKey,
+                reviewApiInfo.modelName,
+                reviewApiInfo.apiURL,
+                (completed, total) => {
+                  sendProgress({
+                    stage: 'reviewing',
+                    mode: 'full',
+                    total,
+                    completed,
+                    percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
+                    message: '正在审核校对结果'
+                  })
+                },
+                reviewApiInfo.provider,
+                streamSink,
+                cancelToken
+              )
+              proofResult = reviewedResult
+              token_usage += reviewTokens
+            } catch (reviewError) {
+              if (cancelToken.cancelled) throw reviewError
+              console.error('审核校对结果失败，保留未过滤结果继续:', reviewError)
+              failedSegments.push({
+                stage: 'review',
+                index: 0,
+                label: 'review',
+                message: reviewError instanceof Error ? reviewError.message : String(reviewError)
+              })
+            }
           }
           // 确保返回的数据是可克隆的
           try {
             const result = {
               proofResult: JSON.parse(JSON.stringify(proofResult)),
-              token_usage: token_usage
+              token_usage: token_usage,
+              failedSegments
             }
             return result
           } catch (error) {
@@ -579,13 +630,13 @@ export const registerIpcHandlers = () => {
           const sendProgress = (payload: ProofreadProgressPayload) => {
             event.sender.send(PROOFREAD_PROGRESS_CHANNEL, payload)
           }
-          const { proofResult, token_usage } = await reduceAIDetectionDocument(
+          const { proofResult, token_usage, failedSegments } = await reduceAIDetectionDocument(
             filePath,
             api_info.apiKey,
             api_info.modelName,
             api_info.apiURL,
             parallelSet,
-            setTimeLimit,
+            requestsPerMinute,
             sendProgress,
             api_info.provider,
             streamSink,
@@ -594,7 +645,8 @@ export const registerIpcHandlers = () => {
           try {
             const result = {
               proofResult: JSON.parse(JSON.stringify(proofResult)),
-              token_usage: token_usage
+              token_usage: token_usage,
+              failedSegments
             }
             return result
           } catch (error) {
@@ -617,7 +669,8 @@ export const registerIpcHandlers = () => {
         }
         return {
           proofResult: null,
-          token_usage: 0
+          token_usage: 0,
+          message: error instanceof Error ? error.message : String(error)
         }
       } finally {
         activeProofreadTokens.delete(runId || '')
@@ -660,6 +713,9 @@ export const registerIpcHandlers = () => {
     success: boolean
     canceled: boolean
     filePath?: string
+    appliedCount?: number
+    /** 未能在文档中匹配到原文的建议条数 */
+    unmatchedCount?: number
   }
 
   // Export corrected DOCX file
@@ -689,11 +745,13 @@ export const registerIpcHandlers = () => {
         }
       }
 
-      await replaceTextInDocx(filePath, saveResult.filePath, correctedText)
+      const replaceResult = await replaceTextInDocx(filePath, saveResult.filePath, correctedText)
       return {
         success: true,
         canceled: false,
-        filePath: saveResult.filePath
+        filePath: saveResult.filePath,
+        appliedCount: replaceResult.appliedCount,
+        unmatchedCount: replaceResult.unmatchedCount
       }
     } catch (error) {
       console.error('output error:', error)

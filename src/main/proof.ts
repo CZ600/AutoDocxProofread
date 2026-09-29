@@ -332,6 +332,7 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
  * @param processor 处理单个元素的异步函数
  * @param options 可选配置项
  * @param options.requestsPerMinute 每分钟最大请求数，用于速率限制
+ * @param options.onItemFailed 单个任务失败回调（index 为 items 下标），用于收集失败分片
  * @returns 返回一个包含所有成功处理结果的 Promise
  */
 export async function runWithLimits<T, R>(
@@ -341,6 +342,7 @@ export async function runWithLimits<T, R>(
   options?: {
     requestsPerMinute?: number
     onItemCompleted?: (completed: number, total: number) => void
+    onItemFailed?: (index: number, error: unknown) => void
     shouldCancel?: () => boolean
   }
 ): Promise<R[]> {
@@ -349,7 +351,7 @@ export async function runWithLimits<T, R>(
   let completedCount = 0
 
   // --- 新增逻辑: 速率限制初始化 ---
-  const { requestsPerMinute, onItemCompleted, shouldCancel } = options || {}
+  const { requestsPerMinute, onItemCompleted, onItemFailed, shouldCancel } = options || {}
   const hasRateLimit = typeof requestsPerMinute === 'number' && requestsPerMinute > 0
 
   // 计算两次请求之间的最小时间间隔（毫秒）
@@ -388,6 +390,7 @@ export async function runWithLimits<T, R>(
       } catch (error) {
         console.error(`并发任务 ${i} 失败:`, error)
         results[i] = undefined
+        onItemFailed?.(i, error)
       }
     }
 
@@ -1331,12 +1334,30 @@ async function proofreadTextWithRAG(
   } catch (error) {
     // 取消不属于"校对失败"：向上传播，让整个校对流程终止
     if (cancelToken?.cancelled) throw new ProofreadCancelledError()
+    // 失败不再静默吞成空结果：向上抛给 runWithLimits 记入 failedSegments，
+    // 否则断网/鉴权失败会表现为「该段没有建议」的假成功，用户无法察觉结果不完整
     console.error(getLocalizedConsoleMessages().proofTextFailed, error)
-    return { result: [], use_tokens: 0 }
+    throw error
   }
 }
 
 // ====== 主校对函数 ======
+
+/** 校对过程中失败的分片：随 process-docx 返回给渲染端做可观测提示 */
+export interface FailedSegment {
+  stage: 'proofread' | 'reduce' | 'review'
+  index: number
+  /** 分片摘要（章节标题 / 句子前缀 / 段落序号），用于失败提示定位 */
+  label: string
+  /** 失败原因摘要 */
+  message: string
+}
+
+function toFailureMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
 export async function proofreadDocument(
   documentPath: string,
   mode: 'section' | 'sentence' | 'full',
@@ -1346,22 +1367,25 @@ export async function proofreadDocument(
   repositoryNameList?: string[],
   embeddingConfig?: ApiSettings,
   parallelSet = 30,
-  setTimeLimit?: number,
+  requestsPerMinute?: number,
   onProgress?: (payload: ProofreadProgressPayload) => void,
   provider?: ModelProvider,
   streamSink?: ProofreadStreamSink | null,
   cancelToken?: ProofreadCancelToken | null
-): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number }> {
+): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number; failedSegments: FailedSegment[] }> {
   console.log('process mode is:', mode)
   console.log('process api is:', apiURL, modelName)
   const progressMessages = getLocalizedProgressMessages()
   const effectivePrompt = getCurrentEffectivePrompt()
   let total_tokens = 0 // calculate the usage of tokens
-  const option = setTimeLimit // set the limit of request per minute
+  // set the limit of request per minute
+  const option = requestsPerMinute
     ? {
-      requestsPerMinute: setTimeLimit
-    }
+        requestsPerMinute
+      }
     : undefined
+  // 失败分片收集：默认空数组（full 模式单请求失败直接向上抛错，走整体失败提示）
+  const failedSegments: FailedSegment[] = []
 
   try {
     const fileName = path.basename(documentPath)
@@ -1377,7 +1401,8 @@ export async function proofreadDocument(
       if (!text)
         return {
           proofResult: null,
-          token_usage: 0
+          token_usage: 0,
+          failedSegments
         }
       const { result, use_tokens } = await proofreadTextWithRAG(
         text,
@@ -1402,7 +1427,7 @@ export async function proofreadDocument(
         percent: 100,
         message: progressMessages.completed
       })
-      return { proofResult: result, token_usage: total_tokens }
+      return { proofResult: result, token_usage: total_tokens, failedSegments }
     }
 
     onProgress?.({
@@ -1430,7 +1455,8 @@ export async function proofreadDocument(
     if (nonEmptySections.length === 0)
       return {
         proofResult: null,
-        token_usage: 0
+        token_usage: 0,
+        failedSegments
       }
 
     let allCorrections: ProofreadingCorrection[] = []
@@ -1469,6 +1495,14 @@ export async function proofreadDocument(
         {
           ...option,
           shouldCancel: () => cancelToken?.cancelled ?? false,
+          onItemFailed: (failedIndex, error) => {
+            failedSegments.push({
+              stage: 'proofread',
+              index: failedIndex,
+              label: nonEmptySections[failedIndex]?.title?.slice(0, 20) || `#${failedIndex + 1}`,
+              message: toFailureMessage(error)
+            })
+          },
           onItemCompleted: (completed, total) => {
             onProgress?.({
               stage: 'proofreading',
@@ -1551,6 +1585,15 @@ export async function proofreadDocument(
         const sentenceResults = await runWithLimits(sentenceTasks, parallelSet, task => task.run(), {
           ...option,
           shouldCancel: () => cancelToken?.cancelled ?? false,
+          onItemFailed: (failedIndex, error) => {
+            const failedTask = sentenceTasks[failedIndex]
+            failedSegments.push({
+              stage: 'proofread',
+              index: failedIndex,
+              label: failedTask?.label || `#${failedIndex + 1}`,
+              message: toFailureMessage(error)
+            })
+          },
           onItemCompleted: (completed, total) => {
             onProgress?.({
               stage: 'proofreading',
@@ -1586,14 +1629,16 @@ export async function proofreadDocument(
       ...(correction.filterReason ? { filterReason: correction.filterReason } : {})
     }))
 
-    console.log('校对结果:', serializableCorrections)
+    if (failedSegments.length > 0) {
+      console.warn(`校对完成，但有 ${failedSegments.length} 个分片失败:`, failedSegments)
+    }
     onProgress?.({
       stage: 'completed',
       mode,
       percent: 100,
       message: progressMessages.completed
     })
-    return { proofResult: serializableCorrections, token_usage: total_tokens }
+    return { proofResult: serializableCorrections, token_usage: total_tokens, failedSegments }
   } catch (error) {
     console.error(getLocalizedConsoleMessages().documentProofError, error)
     throw error
@@ -1694,19 +1739,20 @@ export async function reduceAIDetectionDocument(
   modelName: string,
   apiURL: string,
   parallelSet = 30,
-  setTimeLimit?: number,
+  requestsPerMinute?: number,
   onProgress?: (payload: ProofreadProgressPayload) => void,
   provider?: ModelProvider,
   streamSink?: ProofreadStreamSink | null,
   cancelToken?: ProofreadCancelToken | null
-): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number }> {
+): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number; failedSegments: FailedSegment[] }> {
   const prompts = getPrompts()
   const reducePrompt = prompts.REDUCE_AI_RATE_SYSTEM_PROMPT || zhCNPrompts.REDUCE_AI_RATE_SYSTEM_PROMPT
   const reduceReason = prompts.REDUCE_AI_RATE_REASON || zhCNPrompts.REDUCE_AI_RATE_REASON
   const reduceProgress = prompts.REDUCE_AI_RATE_PROGRESS_MESSAGES || zhCNPrompts.REDUCE_AI_RATE_PROGRESS_MESSAGES
   let total_tokens = 0
 
-  const option = setTimeLimit ? { requestsPerMinute: setTimeLimit } : undefined
+  const option = requestsPerMinute ? { requestsPerMinute } : undefined
+  const failedSegments: FailedSegment[] = []
 
   try {
     onProgress?.({
@@ -1768,7 +1814,7 @@ export async function reduceAIDetectionDocument(
     }
 
     if (validParagraphs.length === 0) {
-      return { proofResult: [], token_usage: 0 }
+      return { proofResult: [], token_usage: 0, failedSegments }
     }
 
     onProgress?.({
@@ -1832,6 +1878,14 @@ export async function reduceAIDetectionDocument(
       {
         ...option,
         shouldCancel: () => cancelToken?.cancelled ?? false,
+        onItemFailed: (failedIndex, error) => {
+          failedSegments.push({
+            stage: 'reduce',
+            index: failedIndex,
+            label: `#${failedIndex + 1}`,
+            message: toFailureMessage(error)
+          })
+        },
         onItemCompleted: (completed, total) => {
           onProgress?.({
             stage: 'reducing',
@@ -1862,6 +1916,9 @@ export async function reduceAIDetectionDocument(
     }))
 
     console.log('降低AI率结果:', serializableCorrections.length, '条改写')
+    if (failedSegments.length > 0) {
+      console.warn(`降低AI率完成，但有 ${failedSegments.length} 个分片失败:`, failedSegments)
+    }
     onProgress?.({
       stage: 'completed',
       mode: 'section',
@@ -1869,7 +1926,7 @@ export async function reduceAIDetectionDocument(
       message: reduceProgress.completed
     })
 
-    return { proofResult: serializableCorrections, token_usage: total_tokens }
+    return { proofResult: serializableCorrections, token_usage: total_tokens, failedSegments }
   } catch (error) {
     console.error('降低AI率处理出错:', error)
     throw error

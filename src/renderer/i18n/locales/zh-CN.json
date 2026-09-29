@@ -93,6 +93,8 @@
       "historyIpcFailed": "与主进程通信失败，无法保存历史记录",
       "historyUnexpectedError": "保存历史记录时发生错误: ",
       "exportSuccess": "文件导出成功：",
+      "exportUnmatched": "；{count} 条建议未在文档中匹配到",
+      "failedSegments": "{count} 个分片校对失败，结果可能不完整",
       "exportIncomplete": "导出过程未完成",
       "exportFailed": "导出失败: ",
       "electronNotLoaded": "Electron 环境未正确加载...",
@@ -188,7 +190,11 @@
     "groupRuntime": "运行参数",
     "languageDesc": "切换应用界面显示语言",
     "reviewModelConfig": "审核模型配置",
-    "reviewModelDesc": "配置用于自动审核校对结果的大模型。校对完成后，将使用该模型过滤不必要的校对建议。默认使用校对模型，如需不同模型请手动选择。",
+    "reviewModelDesc": "校对完成后默认不执行复核。开启「结果复核」或选择审核模型后，将在校对结束时过滤不必要的建议（复核会使 token 消耗约增加一倍）。",
+    "reviewEnableLabel": "启用结果复核",
+    "reviewEnableHint": "未选择审核模型时使用校对模型执行",
+    "reviewEnabledToast": "已开启结果复核",
+    "reviewDisabledToast": "已关闭结果复核",
     "selectReviewModel": "选择审核模型",
     "reviewModelPlaceholder": "默认使用校对模型",
     "restoreDefault": "恢复默认",
@@ -523,10 +529,12 @@
     "validNameRequired": "请输入模型名称"
   },
   "rateLimit": {
-    "title": "请求频率限制",
-    "description": "限制每分钟的请求频率，默认不限制。如果使用的接口有相关的限制，请根据接口提供商的要求自行开启",
+    "title": "每分钟请求数上限",
+    "description": "限制每分钟发送给模型的请求数，默认不限制。如果使用的接口有频率限制，请根据接口提供商的要求自行开启",
     "disableLimit": "关闭限制",
-    "enableLimit": "开启限制"
+    "enableLimit": "开启限制",
+    "timeoutLabel": "单请求超时（秒）",
+    "timeoutHint": "超时的分片按失败处理，默认 300 秒"
   },
   "concurrency": {
     "title": "并发设置",

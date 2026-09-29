@@ -24,6 +24,65 @@ import { ModelProvider, getProviderBaseURL } from '../shared/modelProviders'
 /** 流式回调：每收到一段增量文本调用一次 */
 export type OnChunk = (text: string) => void
 
+// ====== 单请求超时与客户端复用 ======
+// 单请求超时（毫秒）：默认 300s 宽松起步，避免误杀慢模型；设置页可覆盖。
+const DEFAULT_REQUEST_TIMEOUT_MS = 300_000
+let currentRequestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS
+
+/**
+ * 设置单请求超时（毫秒）。传 null/非法值恢复默认。
+ * 超时值参与 SDK 客户端的缓存键，修改后新构造的客户端即使用新超时。
+ */
+export function setRequestTimeoutMs(timeoutMs: number | null): void {
+  currentRequestTimeoutMs =
+    typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
+      ? timeoutMs
+      : DEFAULT_REQUEST_TIMEOUT_MS
+}
+
+// 模块级 SDK 客户端缓存：按 (kind, baseURL, apiKey, timeoutMs, 附加头) 复用，
+// 避免每次请求都重新构造客户端。maxRetries=2 利用 SDK 自带的 429/5xx 指数退避。
+const clientCache = new Map<string, unknown>()
+
+function getOpenAIClient(apiKey: string, baseURL?: string): OpenAI {
+  const cacheKey = `openai|${baseURL || ''}|${apiKey}|${currentRequestTimeoutMs}`
+  const cached = clientCache.get(cacheKey)
+  if (cached) return cached as OpenAI
+  const client = new OpenAI({
+    apiKey: apiKey,
+    baseURL: baseURL || undefined,
+    timeout: currentRequestTimeoutMs,
+    maxRetries: 2
+  })
+  clientCache.set(cacheKey, client)
+  return client
+}
+
+function getAnthropicClient(apiKey: string, baseURL?: string, defaultHeaders?: Record<string, string>): Anthropic {
+  const cacheKey = `anthropic|${baseURL || ''}|${apiKey}|${currentRequestTimeoutMs}|${JSON.stringify(defaultHeaders ?? null)}`
+  const cached = clientCache.get(cacheKey)
+  if (cached) return cached as Anthropic
+  const options: any = {
+    apiKey,
+    timeout: currentRequestTimeoutMs,
+    maxRetries: 2
+  }
+  if (baseURL) options.baseURL = baseURL
+  if (defaultHeaders) options.defaultHeaders = defaultHeaders
+  const client = new Anthropic(options)
+  clientCache.set(cacheKey, client)
+  return client
+}
+
+function getGeminiClient(apiKey: string, baseURL?: string): GoogleGenerativeAI {
+  const cacheKey = `gemini|${baseURL || ''}|${apiKey}`
+  const cached = clientCache.get(cacheKey)
+  if (cached) return cached as GoogleGenerativeAI
+  const client = new GoogleGenerativeAI(apiKey)
+  clientCache.set(cacheKey, client)
+  return client
+}
+
 /** 校验 Gemini 响应有效性（流式与非流式共用） */
 function validateGeminiResponse(response: any): void {
   if (response.promptFeedback?.blockReason) {
@@ -50,7 +109,7 @@ export async function getGeminiResponse(
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey)
+    const genAI = getGeminiClient(apiKey, apiURL)
 
     const model = genAI.getGenerativeModel(
       {
@@ -60,14 +119,17 @@ export async function getGeminiResponse(
           parts: [{ text: systemPrompt }]
         }
       },
-      apiURL ? { baseUrl: apiURL.trim().replace(/\/+$/, '') } : undefined
+      apiURL
+        ? { baseUrl: apiURL.trim().replace(/\/+$/, ''), timeout: currentRequestTimeoutMs }
+        : { timeout: currentRequestTimeoutMs }
     )
 
     const generationConfig: GenerationConfig = {
       temperature: 0.9,
       topK: 1,
       topP: 1,
-      maxOutputTokens: 2048
+      // 长章节 JSON 输出在 2048 下会被截断导致降级解析丢建议，放宽到 8192
+      maxOutputTokens: 8192
     }
 
     const safetySettings: SafetySetting[] = [
@@ -163,10 +225,7 @@ export async function OpenaiGen(
   console.log(`[OpenaiGen] calling: ${targetURL} | model: ${modelName}`)
 
   try {
-    const openai = new OpenAI({
-      apiKey: apiKey,
-      baseURL: apiURL
-    })
+    const openai = getOpenAIClient(apiKey, apiURL)
 
     if (onChunk) {
       // 流式路径：include_usage 让服务端在最后一个 chunk 携带 token 用量。
@@ -279,10 +338,7 @@ export async function OpenaiGen(
 // 测试api可用性
 export async function testAPI(apiURL: string, apiKey: string, modelName: string): Promise<boolean> {
   try {
-    const openai = new OpenAI({
-      apiKey: apiKey,
-      baseURL: apiURL
-    })
+    const openai = getOpenAIClient(apiKey, apiURL)
 
     const chatCompletion = await openai.chat.completions.create({
       model: modelName,
@@ -387,10 +443,7 @@ export async function getEmbedding(text: string | string[], modelName: string, a
     throw new Error('Text parameter cannot be an empty string')
   }
 
-  const openai = new OpenAI({
-    apiKey: apiKey_input,
-    baseURL: normalizeOpenAIBaseURL(apiURL)
-  })
+  const openai = getOpenAIClient(apiKey_input, normalizeOpenAIBaseURL(apiURL))
 
   const maxAttempts = 5
   let lastError: any = null
@@ -504,16 +557,12 @@ export async function getAnthropicResponse(
   if (!apiKey) throw new Error('API key is missing.')
 
   try {
-    const options: any = { apiKey }
-    if (apiURL) {
-      options.baseURL = normalizeAnthropicBaseURL(apiURL)
-      console.log(`[getAnthropicResponse] baseURL=${options.baseURL}, model=${modelName}`)
-    }
-    const anthropic = new Anthropic(options)
+    const anthropic = getAnthropicClient(apiKey, apiURL ? normalizeAnthropicBaseURL(apiURL) : undefined)
 
     const createParams: any = {
       model: modelName,
-      max_tokens: 2048,
+      // 长章节 JSON 输出在 2048 下会被截断导致降级解析丢建议，放宽到 8192
+      max_tokens: 8192,
       temperature: 0.7,
       system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
@@ -668,22 +717,32 @@ export async function getKimiResponse(
 // ====================== 9. 模拟 Claude Code ======================
 import { randomUUID } from 'crypto'
 
-function createClaudeCodeClient(apiKey: string, apiURL?: string) {
+function getClaudeCodeClient(apiKey: string, apiURL?: string) {
+  const baseURL = apiURL ? normalizeAnthropicBaseURL(apiURL) : ''
+  if (baseURL) {
+    console.log(`[getClaudeCodeClient] baseURL=${baseURL}`)
+  }
+  const cacheKey = `claudecode|${baseURL}|${apiKey}|${currentRequestTimeoutMs}`
+  const cached = clientCache.get(cacheKey)
+  if (cached) return cached as { client: Anthropic; sessionId: string }
+  // sessionId 只是遥测分组标识，随客户端一次性生成并复用；
+  // 若每次请求都随机生成，会连带缓存键变化导致客户端永不复用。
   const sessionId = randomUUID()
-  const options: any = {
+  const client = new Anthropic({
     apiKey,
+    timeout: currentRequestTimeoutMs,
+    maxRetries: 2,
+    ...(baseURL ? { baseURL } : {}),
     defaultHeaders: {
       'x-app': 'cli',
       'User-Agent': 'claude-code/1.0.26',
       'X-Claude-Code-Session-Id': sessionId,
       'anthropic-client-type': 'cli'
     }
-  }
-  if (apiURL) {
-    options.baseURL = normalizeAnthropicBaseURL(apiURL)
-    console.log(`[createClaudeCodeClient] baseURL=${options.baseURL}`)
-  }
-  return { client: new Anthropic(options), sessionId }
+  } as any)
+  const entry = { client, sessionId }
+  clientCache.set(cacheKey, entry)
+  return entry
 }
 
 const CLAUDE_CODE_TOOLS = [
@@ -741,7 +800,7 @@ export async function getClaudeCodeResponse(
   if (!apiKey) throw new Error('API key is missing.')
 
   try {
-    const { client, sessionId } = createClaudeCodeClient(apiKey, apiURL)
+    const { client, sessionId } = getClaudeCodeClient(apiKey, apiURL)
     const clientRequestId = randomUUID()
 
     const params: any = {
@@ -872,9 +931,7 @@ export async function testAPIWithProvider(
 ): Promise<boolean> {
   try {
     if (provider === ModelProvider.ANTHROPIC) {
-      const options: any = { apiKey }
-      if (apiURL) options.baseURL = normalizeAnthropicBaseURL(apiURL)
-      const anthropic = new Anthropic(options)
+      const anthropic = getAnthropicClient(apiKey, apiURL ? normalizeAnthropicBaseURL(apiURL) : undefined)
       const message = await anthropic.messages.create({
         model: modelName,
         max_tokens: 100,
@@ -884,7 +941,7 @@ export async function testAPIWithProvider(
     }
 
     if (provider === ModelProvider.CLAUDE_CODE) {
-      const { client, sessionId } = createClaudeCodeClient(apiKey, apiURL)
+      const { client, sessionId } = getClaudeCodeClient(apiKey, apiURL)
       const testParams: any = {
         model: modelName,
         max_tokens: 100,
@@ -906,10 +963,12 @@ export async function testAPIWithProvider(
     }
 
     if (provider === ModelProvider.GEMINI) {
-      const genAI = new GoogleGenerativeAI(apiKey)
+      const genAI = getGeminiClient(apiKey, apiURL)
       const model = genAI.getGenerativeModel(
         { model: modelName },
-        apiURL ? { baseUrl: apiURL.trim().replace(/\/+$/, '') } : undefined
+        apiURL
+          ? { baseUrl: apiURL.trim().replace(/\/+$/, ''), timeout: currentRequestTimeoutMs }
+          : { timeout: currentRequestTimeoutMs }
       )
       const result = await model.generateContent('Hello')
       return !!result.response

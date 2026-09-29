@@ -70,6 +70,17 @@ export interface ExportCorrectedDocxResult {
   success: boolean
   canceled: boolean
   filePath?: string
+  appliedCount?: number
+  /** 未能在文档中匹配到原文的建议条数 */
+  unmatchedCount?: number
+}
+
+/** 校对过程中失败的分片（与主进程 proof.ts 的 FailedSegment 对应） */
+export interface FailedSegment {
+  stage: 'proofread' | 'reduce' | 'review'
+  index: number
+  label: string
+  message: string
 }
 
 export default interface ElectronApi {
@@ -120,7 +131,8 @@ export default interface ElectronApi {
     modelName: string,
     parallel?: number,
     TimeLimit?: number | null,
-    provider?: string
+    provider?: string,
+    requestTimeoutSec?: number | null
   ) => Promise<boolean>
 
   // 文档处理接口
@@ -129,16 +141,19 @@ export default interface ElectronApi {
     filePath: string,
     repositoryNameList?: string[],
     embeddingConfig?: apiSettings,
-    setTimeLimit?: number,
+    requestsPerMinute?: number,
     parallelSet?: number,
     reviewModelId?: number | null,
     runId?: string,
-    proofMode?: string
+    proofMode?: string,
+    reviewEnabled?: boolean
   ) => Promise<{
     proofResult: ProofreadingCorrection[]
     token_usage: number
     cancelled?: boolean
-  }> // 进行了更新
+    message?: string
+    failedSegments?: FailedSegment[]
+  }>
   // 取消当前校对任务（按 runId 精确取消；不传则取消全部活跃任务）
   cancelProofread: (runId?: string) => Promise<void>
   onProofreadProgress: (callback: (payload: ProofreadProgressPayload) => void) => () => void

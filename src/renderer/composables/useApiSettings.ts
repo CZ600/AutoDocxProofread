@@ -111,9 +111,18 @@ export function useApiSettings() {
   })
 
   const timeLimit = computed({
+    // 注意：TimeLimit 的实际语义是「每分钟请求数上限」（历史命名，localStorage 键保持兼容）
     get: () => apiStore.selectedApi.TimeLimit,
     set: (value: number | null) => {
       apiStore.setTimeLimit(value)
+    }
+  })
+
+  /** 单请求超时（秒）；null 表示使用主进程默认值（300s） */
+  const requestTimeoutSec = computed({
+    get: () => apiStore.selectedApi.requestTimeoutSec,
+    set: (value: number | null) => {
+      apiStore.setSelectedApi({ requestTimeoutSec: value })
     }
   })
 
@@ -306,6 +315,11 @@ export function useApiSettings() {
     await syncApiSettingsToBackend()
   }
 
+  const updateRequestTimeout = async (value: number | null) => {
+    requestTimeoutSec.value = value
+    await syncApiSettingsToBackend()
+  }
+
   const syncApiSettingsToBackend = async () => {
     const currentSettings = apiStore.selectedApi
     if (currentSettings.id === null) {
@@ -321,7 +335,8 @@ export function useApiSettings() {
         currentSettings.TimeLimit,
         // 兼容旧版本 localStorage（可能没有 provider 字段），
         // Electron IPC 不传 undefined，会导致主进程使用默认值 openai_compatible
-        currentSettings.provider || ModelProvider.OPENAI_COMPATIBLE
+        currentSettings.provider || ModelProvider.OPENAI_COMPATIBLE,
+        currentSettings.requestTimeoutSec ?? null
       )
     } catch (error) {
       console.error('同步 API 设置失败:', error)
@@ -370,6 +385,7 @@ export function useApiSettings() {
     parallelValue,
     openTimeLimit,
     timeLimit,
+    requestTimeoutSec,
     showAlertSuccess,
     showAlertError,
     alertTitle,
@@ -384,6 +400,7 @@ export function useApiSettings() {
     updateParallel,
     toggleTimeLimit,
     updateTimeLimit,
+    updateRequestTimeout,
     findApiSetting,
     initialize
   }

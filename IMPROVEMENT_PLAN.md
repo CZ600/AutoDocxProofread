@@ -100,12 +100,21 @@
 
 ### 任务清单
 
-- [ ] **review 阶段显式开关（成本减半）**：`ipcHandlers.ts:369-371` 的 `if (!reviewApiInfo && api_info)` 中 `api_info` 为模块级对象恒真 → 现状是即使用户未选审核模型，wordError/ComprehensiveError/polish 三种模式（`:343-601` 三段复制代码）都会用主模型把全部建议再跑一遍。改为：仅当用户显式选择审核模型或开启「结果复核」开关时执行，默认关闭；设置页暴露开关；README/changelog 说明行为变化。建议先抽一个 `shouldRunReview()` 辅助函数在三分支共用（批次 10 再做彻底合并）。
-- [ ] **超时语义修正**：前端 `setTimeLimit` 实际被当作 `requestsPerMinute` 使用（`ipcHandlers.ts:259-271` → `proof.ts:1359-1363`）→ 把设置项标签与传参改名为「每分钟请求数上限」；**新增**「单请求超时（秒）」设置（默认宽松，如 300s），透传到 `chat.ts` 所有客户端构造（OpenAI/Anthropic SDK `timeout`，Gemini `requestTimeout`）。
-- [ ] **客户端复用**：`chat.ts:166-169/390-393/512` 每次请求内 `new OpenAI()/new Anthropic()` → 按 `(baseURL, apiKey, provider)` 模块级缓存复用；`maxRetries` 设 2~3（SDK 自带对 429/5xx 的指数退避）。
-- [ ] **失败分片可观测**：`proof.ts:1330-1335`（失败返回空结果）与 `:382-391`（失败任务被 filter 掉仅 console.error）→ `runWithLimits` 收集 `{stage, index, error}` 列表，process-docx 返回 `failedSegments`；前端校对完成后提示「N 个分片校对失败」。（可选进阶：支持「仅重试失败分片」。）
-- [ ] **max_tokens 可配置**：`chat.ts:70`（Gemini `maxOutputTokens: 2048`）与 `chat.ts:516`（Anthropic `max_tokens: 2048`）默认提高到 8192 或读取设置，消除长章节 JSON 截断→降级解析丢建议的问题（Claude Code 路径已是 16000，参考 `chat.ts:749`）。
-- [ ] **导出未匹配上报**：`wordProcess.ts:397-404` 已统计 `unmatched` 但只打 console → 沿 `exportCorrectedDocx` 返回链（`ipcHandlers.ts:686-691`）带到前端，导出成功提示附带「X 条建议未在文档中匹配到」。
+- [x] **review 阶段显式开关（成本减半）**：`ipcHandlers.ts:369-371` 的 `if (!reviewApiInfo && api_info)` 中 `api_info` 为模块级对象恒真 → 现状是即使用户未选审核模型，wordError/ComprehensiveError/polish 三种模式（`:343-601` 三段复制代码）都会用主模型把全部建议再跑一遍。改为：仅当用户显式选择审核模型或开启「结果复核」开关时执行，默认关闭；设置页暴露开关；README/changelog 说明行为变化。建议先抽一个 `shouldRunReview()` 辅助函数在三分支共用（批次 10 再做彻底合并）。
+- [x] **超时语义修正**：前端 `setTimeLimit` 实际被当作 `requestsPerMinute` 使用（`ipcHandlers.ts:259-271` → `proof.ts:1359-1363`）→ 把设置项标签与传参改名为「每分钟请求数上限」；**新增**「单请求超时（秒）」设置（默认宽松，如 300s），透传到 `chat.ts` 所有客户端构造（OpenAI/Anthropic SDK `timeout`，Gemini `requestTimeout`）。
+- [x] **客户端复用**：`chat.ts:166-169/390-393/512` 每次请求内 `new OpenAI()/new Anthropic()` → 按 `(baseURL, apiKey, provider)` 模块级缓存复用；`maxRetries` 设 2~3（SDK 自带对 429/5xx 的指数退避）。
+- [x] **失败分片可观测**：`proof.ts:1330-1335`（失败返回空结果）与 `:382-391`（失败任务被 filter 掉仅 console.error）→ `runWithLimits` 收集 `{stage, index, error}` 列表，process-docx 返回 `failedSegments`；前端校对完成后提示「N 个分片校对失败」。（可选进阶：支持「仅重试失败分片」。）
+- [x] **max_tokens 可配置**：`chat.ts:70`（Gemini `maxOutputTokens: 2048`）与 `chat.ts:516`（Anthropic `max_tokens: 2048`）默认提高到 8192 或读取设置，消除长章节 JSON 截断→降级解析丢建议的问题（Claude Code 路径已是 16000，参考 `chat.ts:749`）。
+- [x] **导出未匹配上报**：`wordProcess.ts:397-404` 已统计 `unmatched` 但只打 console → 沿 `exportCorrectedDocx` 返回链（`ipcHandlers.ts:686-691`）带到前端，导出成功提示附带「X 条建议未在文档中匹配到」。
+
+**实施说明（2026-09-29）**：
+- `shouldRunReview()` 抽为零依赖模块 `src/main/reviewGate.ts`（可直测，见 `__tests__/reviewGate.test.ts`）；三分支的审核模型解析收敛为 `resolveReviewApiInfo()`（显式选择审核模型→查库，失败回退校对模型）。开关在 API 设置页「审核模型配置」区（`apiStore.reviewEnabled`，localStorage 持久化，默认关）。额外加固：审核阶段失败不再让整个校对失败——保留未过滤结果并记入 failedSegments。README「重要提醒」区已补充行为变化说明。
+- 主进程参数链 `TimeLimit`→`requestsPerMinute` 已按语义更名（localStorage 持久化键保持 `TimeLimit` 兼容）；新增 `requestTimeoutSec` 设置（RateLimitSettings 卡片内，默认 300s，5~3600s），经 selectAPISetting → `api_info` → process-docx `setRequestTimeoutMs()` 透传到 chat.ts 客户端工厂。Gemini SDK 的选项实际名为 `RequestOptions.timeout`（计划中的 requestTimeout 不存在），毫秒单位。
+- 客户端缓存键为 (kind, baseURL, apiKey, timeoutMs, defaultHeaders)；模拟 Claude Code 的 sessionId 随客户端一次性生成复用——若每次请求随机生成会连带缓存键漂移导致永不命中。maxRetries=2。
+- `proofreadTextWithRAG` 不再把失败吞成空结果（改为向上抛，由 runWithLimits 记入失败分片）；`runWithLimits` 新增 `onItemFailed` 回调；proofreadDocument/reduceAIDetectionDocument 返回 `failedSegments`（stage/index/label/message），DocPreview 校对完成后 warning 提示「N 个分片校对失败」。顺带修复：process-docx 外层 catch 现在返回 `message`，前端不再把主进程报错静默显示为空校对成功。
+- max_tokens：Gemini `maxOutputTokens` 与 Anthropic `max_tokens` 2048→8192；Claude Code 路径已是 16000，未动。「读取设置」的可配置化未做（计划允许二选一）。
+- 导出未匹配：`replaceTextInDocx` 返回 `{appliedCount, unmatchedCount}`，exportCorrectedDocx 透传，DocPreview 导出成功提示 >0 时以 warning 附带「X 条建议未在文档中匹配到」。
+- 验证：`npm test` 140 通过（失败 20 个均为既有真实 LLM 集成测试 401/网络，失败文件集合与基线一致）；`npm run lint` 无新增错误；`npm run build`、`npm run build:win` 绿。UI 项（开关、超时输入、提示）待人工回归。
 
 ### 风险
 

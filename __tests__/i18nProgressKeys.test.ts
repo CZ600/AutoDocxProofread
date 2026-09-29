@@ -15,3 +15,18 @@ describe('i18n 校对进度取消文案', () => {
     i18n.global.locale.value = 'zh-CN'
   })
 })
+
+describe('i18n 批次3新增文案（失败分片 / 导出未匹配 / 结果复核 / 超时设置）', () => {
+  it('两种语言下新键均可解析且含插值占位', () => {
+    for (const locale of ['zh-CN', 'en'] as const) {
+      i18n.global.locale.value = locale
+      expect(i18n.global.t('proof.messages.failedSegments', { count: 3 })).toContain('3')
+      expect(i18n.global.t('proof.messages.exportUnmatched', { count: 2 })).toContain('2')
+      expect(i18n.global.t('apiSettings.reviewEnableLabel')).toBeTruthy()
+      expect(i18n.global.t('apiSettings.reviewEnabledToast')).toBeTruthy()
+      expect(i18n.global.t('rateLimit.timeoutLabel')).toBeTruthy()
+      expect(i18n.global.t('rateLimit.timeoutHint')).toBeTruthy()
+    }
+    i18n.global.locale.value = 'zh-CN'
+  })
+})

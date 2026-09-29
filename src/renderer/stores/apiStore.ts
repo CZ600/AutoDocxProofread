@@ -11,7 +11,10 @@ interface ApiSettings {
   provider: ModelProvider
   time: string
   parallel: number
+  /** 语义为「每分钟请求数上限」（历史命名 TimeLimit 保持不变以兼容 localStorage） */
   TimeLimit: number | null
+  /** 单请求超时（秒），null 表示使用主进程默认值（300s） */
+  requestTimeoutSec: number | null
 }
 
 interface ApiSettingItem {
@@ -37,11 +40,15 @@ const defaultApiSettings: ApiSettings = {
   provider: ModelProvider.OPENAI_COMPATIBLE,
   time: '',
   parallel: 30,
-  TimeLimit: null
+  TimeLimit: null,
+  requestTimeoutSec: null
 }
 
 // 审核模型 ID（null 表示与校对模型一致）
 const defaultReviewModelId: number | null = null
+// 结果复核开关：默认关闭。开启后（未选审核模型时用校对模型）校对完成会自动复核，
+// token 消耗约增加一倍——这是有意为之的成本控制，避免每次校对都被动翻倍
+const defaultReviewEnabled = false
 
 // 默认 token 使用统计
 const defaultTokenUsage: TokenUsage = {
@@ -57,6 +64,7 @@ export const useApiStore = defineStore(
     const selectedApi = reactive<ApiSettings>({ ...defaultApiSettings })
     const tokenUsage = reactive<TokenUsage>({ ...defaultTokenUsage })
     const reviewModelId = ref<number | null>(defaultReviewModelId)
+    const reviewEnabled = ref<boolean>(defaultReviewEnabled)
 
     // API 设置列表
     const apiSettings = reactive<ApiSettingItem[]>([])
@@ -103,6 +111,10 @@ export const useApiStore = defineStore(
       reviewModelId.value = id
     }
 
+    function setReviewEnabled(enabled: boolean) {
+      reviewEnabled.value = enabled
+    }
+
     function clearReviewModel() {
       reviewModelId.value = null
     }
@@ -144,6 +156,7 @@ export const useApiStore = defineStore(
       tokenUsage,
       apiSettings,
       reviewModelId,
+      reviewEnabled,
       setSelectedApi,
       clearSelectedApi,
       setParallel,
@@ -152,6 +165,7 @@ export const useApiStore = defineStore(
       addApiSetting,
       removeApiSetting,
       setReviewModelId,
+      setReviewEnabled,
       clearReviewModel,
       addTotalTokens,
       resetTokenUsage,
@@ -163,7 +177,7 @@ export const useApiStore = defineStore(
     persist: {
       key: 'apiSettings',
       storage: localStorage,
-      pick: ['selectedApi', 'tokenUsage', 'reviewModelId']
+      pick: ['selectedApi', 'tokenUsage', 'reviewModelId', 'reviewEnabled']
     }
   }
 )

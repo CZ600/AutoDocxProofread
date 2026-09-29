@@ -1099,10 +1099,14 @@ const exportToDocx = async () => {
       return
     }
     if (result?.success) {
+      const unmatchedCount = result.unmatchedCount || 0
       ElMessage({
-        message: t('proof.messages.exportSuccess') + (result.filePath || ''),
-        type: 'success',
-        duration: 2000
+        message:
+          t('proof.messages.exportSuccess') +
+          (result.filePath || '') +
+          (unmatchedCount > 0 ? t('proof.messages.exportUnmatched', { count: unmatchedCount }) : ''),
+        type: unmatchedCount > 0 ? 'warning' : 'success',
+        duration: unmatchedCount > 0 ? 4000 : 2000
       })
     } else {
       throw new Error(t('proof.messages.exportIncomplete'))
@@ -1173,7 +1177,15 @@ const onSubmit = async () => {
       return
     }
 
-    await electronAPI.selectAPISetting(apiURL, apiKey, modelName, parallel, timeLimit_, provider)
+    await electronAPI.selectAPISetting(
+      apiURL,
+      apiKey,
+      modelName,
+      parallel,
+      timeLimit_,
+      provider,
+      apiSettingsStore.selectedApi.requestTimeoutSec ?? null
+    )
 
     let results
     let token_usage = 0
@@ -1193,7 +1205,8 @@ const onSubmit = async () => {
         apiSettingsStore.selectedApi.parallel,
         apiSettingsStore.reviewModelId ?? null,
         currentRunId,
-        form.value.proofMode || undefined
+        form.value.proofMode || undefined,
+        apiSettingsStore.reviewEnabled === true
       )
       // 用户取消：主进程中止了在途请求，走取消流程而非报错
       if (preResult?.cancelled) {
@@ -1208,22 +1221,33 @@ const onSubmit = async () => {
         })
         return
       }
-      if ('message' in preResult) {
+      if ('message' in preResult && preResult.message) {
+        // 主进程返回 message 说明参数或链路有问题：统一走错误提示，避免静默空结果
+        clearCloseProgressTimer()
+        stopTicker()
+        progressDialogVisible.value = false
+        progressDetail.value = ''
         if (preResult.message === 'Please select an API setting!') {
           ElMessage({
             message: t('proof.errors.apiKeyRequired'),
             type: 'error',
             duration: 1500
           })
-          clearCloseProgressTimer()
-          stopTicker()
-          progressDialogVisible.value = false
-          progressDetail.value = ''
           return
         }
+        throw new Error(preResult.message)
       }
       results = preResult.proofResult
       token_usage += preResult.token_usage
+      // 失败分片可观测：主进程收集的分片失败（断网/鉴权失败等）在此透出
+      if (preResult.failedSegments && preResult.failedSegments.length > 0) {
+        console.warn('校对失败分片:', preResult.failedSegments)
+        ElMessage({
+          message: t('proof.messages.failedSegments', { count: preResult.failedSegments.length }),
+          type: 'warning',
+          duration: 4000
+        })
+      }
     } else {
       let preResult = await electronAPI.processDocx(
         form.value.model,
@@ -1234,7 +1258,8 @@ const onSubmit = async () => {
         apiSettingsStore.selectedApi.parallel,
         apiSettingsStore.reviewModelId ?? null,
         currentRunId,
-        form.value.proofMode || undefined
+        form.value.proofMode || undefined,
+        apiSettingsStore.reviewEnabled === true
       )
       // 用户取消：主进程中止了在途请求，走取消流程而非报错
       if (preResult?.cancelled) {
@@ -1249,22 +1274,33 @@ const onSubmit = async () => {
         })
         return
       }
-      if ('message' in preResult) {
+      if ('message' in preResult && preResult.message) {
+        // 主进程返回 message 说明参数或链路有问题：统一走错误提示，避免静默空结果
+        clearCloseProgressTimer()
+        stopTicker()
+        progressDialogVisible.value = false
+        progressDetail.value = ''
         if (preResult.message === 'Please select an API setting!') {
           ElMessage({
             message: t('proof.errors.apiKeyRequired'),
             type: 'error',
             duration: 1500
           })
-          clearCloseProgressTimer()
-          stopTicker()
-          progressDialogVisible.value = false
-          progressDetail.value = ''
           return
         }
+        throw new Error(preResult.message)
       }
       results = preResult.proofResult
       token_usage += preResult.token_usage
+      // 失败分片可观测：主进程收集的分片失败（断网/鉴权失败等）在此透出
+      if (preResult.failedSegments && preResult.failedSegments.length > 0) {
+        console.warn('校对失败分片:', preResult.failedSegments)
+        ElMessage({
+          message: t('proof.messages.failedSegments', { count: preResult.failedSegments.length }),
+          type: 'warning',
+          duration: 4000
+        })
+      }
     }
     apiSettingsStore.addTotalTokens(token_usage)
 

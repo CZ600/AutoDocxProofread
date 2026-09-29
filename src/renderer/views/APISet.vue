@@ -54,6 +54,11 @@
             <div class="review-model-desc">
               {{ t('apiSettings.reviewModelDesc') }}
             </div>
+            <div class="review-switch-row">
+              <el-switch v-model="reviewEnabled" @change="handleToggleReview" />
+              <span class="review-switch-label">{{ t('apiSettings.reviewEnableLabel') }}</span>
+              <span class="review-switch-hint">{{ t('apiSettings.reviewEnableHint') }}</span>
+            </div>
             <el-form label-position="top" class="review-model-form">
               <el-form-item :label="t('apiSettings.selectReviewModel')" class="form-item">
                 <el-select
@@ -168,6 +173,18 @@ const handleSubmitApi = async (data: ApiFormData): Promise<boolean> => {
 const handleClearReviewModel = () => {
   apiStore.clearReviewModel()
   ElMessage.success(t('apiSettings.restoredToDefault'))
+}
+
+// 结果复核开关（默认关闭）：开启后校对完成时自动复核，token 消耗约增加一倍
+const reviewEnabled = computed({
+  get: () => apiStore.reviewEnabled,
+  set: (value: boolean) => apiStore.setReviewEnabled(value)
+})
+const handleToggleReview = (value: boolean | string | number) => {
+  apiStore.setReviewEnabled(value === true)
+  ElMessage.success(
+    value === true ? t('apiSettings.reviewEnabledToast') : t('apiSettings.reviewDisabledToast')
+  )
 }
 
 onMounted(async () => {
@@ -364,6 +381,25 @@ onMounted(async () => {
   border: none;
 }
 
+.review-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.review-switch-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #5a6e80;
+}
+
+.review-switch-hint {
+  font-size: 12px;
+  color: #9aa7b4;
+}
+
 .review-model-form {
   padding: 8px 0;
 }
@@ -495,6 +531,14 @@ html.dark .section-header {
 html.dark .review-model-desc {
   color: #8a8a8a;
   background: #1a1a1a;
+}
+
+html.dark .review-switch-label {
+  color: #c0c4cc;
+}
+
+html.dark .review-switch-hint {
+  color: #6f6f6f;
 }
 
 html.dark .btn-subtle {

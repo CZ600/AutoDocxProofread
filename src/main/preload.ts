@@ -51,8 +51,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   testAPI: (url: string, key: string, modelName: string) => ipcRenderer.invoke('test-api', url, key, modelName),
   testAPIWithProvider: (provider: string, url: string, key: string, modelName: string) =>
     ipcRenderer.invoke('test-api-with-provider', provider, url, key, modelName),
-  selectAPISetting: (url: string, key: string, modelName: string, parallel?: number, TimeLimit?: number | null, provider?: string) =>
-    ipcRenderer.invoke('selectAPISetting', url, key, modelName, parallel, TimeLimit, provider),
+  selectAPISetting: (
+    url: string,
+    key: string,
+    modelName: string,
+    parallel?: number,
+    TimeLimit?: number | null,
+    provider?: string,
+    requestTimeoutSec?: number | null
+  ) =>
+    ipcRenderer.invoke('selectAPISetting', url, key, modelName, parallel, TimeLimit, provider, requestTimeoutSec),
   getAPISettings: () => ipcRenderer.invoke('get-api-settings', {}),
   // 文档校对处理函数
   processDocx: (
@@ -60,11 +68,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     filePath: string,
     repositoryNameList?: string[],
     embeddingConfig?: apiSettings,
-    setTimeLimit?: number,
+    requestsPerMinute?: number,
     parallelSet?: number,
     reviewModelId?: number | null,
     runId?: string,
-    proofMode?: string
+    proofMode?: string,
+    reviewEnabled?: boolean
   ) => {
     // 确保传递的参数是可序列化的
     const serializableParams = {
@@ -72,11 +81,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       filePath,
       repositoryNameList: repositoryNameList ? [...repositoryNameList] : undefined,
       embeddingConfig: embeddingConfig ? { ...embeddingConfig } : undefined,
-      setTimeLimit: setTimeLimit || undefined,
+      requestsPerMinute: requestsPerMinute || undefined,
       parallelSet: parallelSet || 30,
       reviewModelId: reviewModelId ?? null,
       runId: runId || undefined,
-      proofMode: proofMode || undefined
+      proofMode: proofMode || undefined,
+      reviewEnabled: reviewEnabled === true
     }
 
     return ipcRenderer.invoke(
@@ -85,11 +95,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       serializableParams.filePath,
       serializableParams.repositoryNameList,
       serializableParams.embeddingConfig,
-      serializableParams.setTimeLimit,
+      serializableParams.requestsPerMinute,
       serializableParams.parallelSet,
       serializableParams.reviewModelId,
       serializableParams.runId,
-      serializableParams.proofMode
+      serializableParams.proofMode,
+      serializableParams.reviewEnabled
     )
   },
 

@@ -286,11 +286,17 @@ function collectAllParagraphs(node: any, result: any[] = []): any[] {
  *   整段替换方式对公式段落是静默丢失。
  * - 普通段落：使用 paragraph.props.text 的整段替换方式（兼容 tab / break）。
  */
+export interface ReplaceTextResult {
+  appliedCount: number
+  /** 未能在文档中匹配到原文的建议条数（导出时被跳过） */
+  unmatchedCount: number
+}
+
 export async function replaceTextInDocx(
   inputPath: string,
   outputPath: string,
   replacements: Replacement[]
-): Promise<void> {
+): Promise<ReplaceTextResult> {
   const sanitizedReplacements = replacements.filter(
     item => item && item.original && item.suggested !== undefined
   )
@@ -399,7 +405,8 @@ export async function replaceTextInDocx(
     outputPath,
     totalReplacements: sanitizedReplacements.length,
     appliedCount,
-    unmatchedCount: unmatched.length,
-    unmatched
+    unmatchedCount: unmatched.length
   })
+
+  return { appliedCount, unmatchedCount: unmatched.length }
 }

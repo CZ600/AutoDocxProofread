@@ -93,6 +93,8 @@
       "historyIpcFailed": "Failed to communicate with main process, unable to save history",
       "historyUnexpectedError": "Error occurred while saving history: ",
       "exportSuccess": "File exported successfully: ",
+      "exportUnmatched": "; {count} suggestion(s) were not matched in the document",
+      "failedSegments": "{count} segment(s) failed to proofread; results may be incomplete",
       "exportIncomplete": "Export process incomplete",
       "exportFailed": "Export failed: ",
       "electronNotLoaded": "Electron environment not loaded correctly...",
@@ -188,7 +190,11 @@
     "groupRuntime": "Runtime",
     "languageDesc": "Switch the interface display language",
     "reviewModelConfig": "Review Model Configuration",
-    "reviewModelDesc": "Configure a large model for automatically reviewing proofreading results. After proofreading, this model will be used to filter unnecessary suggestions. Defaults to the proofreading model; manually select if a different model is needed.",
+    "reviewModelDesc": "By default no review runs after proofreading. Turn on 'Result Review' or select a review model to filter unnecessary suggestions when proofreading finishes (review roughly doubles token usage).",
+    "reviewEnableLabel": "Enable Result Review",
+    "reviewEnableHint": "Uses the proofreading model when no review model is selected",
+    "reviewEnabledToast": "Result review enabled",
+    "reviewDisabledToast": "Result review disabled",
     "selectReviewModel": "Select Review Model",
     "reviewModelPlaceholder": "Default: use proofreading model",
     "restoreDefault": "Restore Default",
@@ -523,10 +529,12 @@
     "validNameRequired": "Please enter the model name"
   },
   "rateLimit": {
-    "title": "Rate Limit",
-    "description": "Limit requests per minute. Default is unlimited. If your API provider has rate limits, enable this according to their requirements",
+    "title": "Requests Per Minute Limit",
+    "description": "Limit the number of requests sent to the model per minute. Default is unlimited. If your API provider has rate limits, enable this according to their requirements",
     "disableLimit": "Disable Limit",
-    "enableLimit": "Enable Limit"
+    "enableLimit": "Enable Limit",
+    "timeoutLabel": "Per-request timeout (seconds)",
+    "timeoutHint": "Timed-out segments are treated as failed; default 300s"
   },
   "concurrency": {
     "title": "Concurrency Settings",
