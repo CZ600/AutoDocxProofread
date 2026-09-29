@@ -99,14 +99,16 @@
               {{ t('proof.progress.cancel') }}
             </el-button>
             <span v-else class="inline-progress-cancelling">{{ t('proof.progress.cancelling') }}</span>
-          </div>
-          <!-- 思考模式开启时：滚动展示模型思维链增量（仅收到过思考内容才出现） -->
-          <div v-if="thinkingText" ref="thinkingBoxRef" class="inline-thinking-box">
-            <div class="inline-thinking-header">
-              <el-icon><ChatDotRound /></el-icon>
-              <span>{{ t('proof.stream.thinking') }}</span>
+            <!-- 思考模式开启时：滚动展示模型思维链增量（仅收到过思考内容才出现）。
+                 必须是 inline-progress-container 的子节点——transition 只允许一个子元素，
+                 且容器 flex-wrap 换行后由 flex-basis:100% 独占第二行 -->
+            <div v-if="thinkingText" ref="thinkingBoxRef" class="inline-thinking-box">
+              <div class="inline-thinking-header">
+                <el-icon><ChatDotRound /></el-icon>
+                <span>{{ t('proof.stream.thinking') }}</span>
+              </div>
+              <div class="inline-thinking-content">{{ thinkingText }}</div>
             </div>
-            <div class="inline-thinking-content">{{ thinkingText }}</div>
           </div>
         </transition>
 
