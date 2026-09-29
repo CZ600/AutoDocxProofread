@@ -126,6 +126,14 @@ export function useApiSettings() {
     }
   })
 
+  /** 思考模式：default 跟随服务商默认 / enabled / disabled */
+  const thinkingMode = computed({
+    get: () => apiStore.selectedApi.thinkingMode || 'default',
+    set: (value: 'default' | 'enabled' | 'disabled') => {
+      apiStore.setSelectedApi({ thinkingMode: value })
+    }
+  })
+
   const fetchAllApiSettings = async () => {
     try {
       const res: any[] = await electronAPI.getALLAPISettings()
@@ -320,6 +328,11 @@ export function useApiSettings() {
     await syncApiSettingsToBackend()
   }
 
+  const updateThinkingMode = async (value: 'default' | 'enabled' | 'disabled') => {
+    thinkingMode.value = value
+    await syncApiSettingsToBackend()
+  }
+
   const syncApiSettingsToBackend = async () => {
     const currentSettings = apiStore.selectedApi
     if (currentSettings.id === null) {
@@ -336,7 +349,8 @@ export function useApiSettings() {
         // 兼容旧版本 localStorage（可能没有 provider 字段），
         // Electron IPC 不传 undefined，会导致主进程使用默认值 openai_compatible
         currentSettings.provider || ModelProvider.OPENAI_COMPATIBLE,
-        currentSettings.requestTimeoutSec ?? null
+        currentSettings.requestTimeoutSec ?? null,
+        currentSettings.thinkingMode || 'default'
       )
     } catch (error) {
       console.error('同步 API 设置失败:', error)
@@ -386,6 +400,7 @@ export function useApiSettings() {
     openTimeLimit,
     timeLimit,
     requestTimeoutSec,
+    thinkingMode,
     showAlertSuccess,
     showAlertError,
     alertTitle,
@@ -401,6 +416,7 @@ export function useApiSettings() {
     toggleTimeLimit,
     updateTimeLimit,
     updateRequestTimeout,
+    updateThinkingMode,
     findApiSetting,
     initialize
   }

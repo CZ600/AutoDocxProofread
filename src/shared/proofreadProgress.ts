@@ -20,7 +20,7 @@ export type ProofreadStreamStage = 'theme' | 'proofread' | 'reduce' | 'review'
 
 /**
  * 主进程 → 渲染进程的流式输出事件。
- * kind = 'chunk'：LLM 增量文本（text 为本次增量）。
+ * kind = 'chunk'：LLM 增量文本（text 为本次增量；thinking=true 时为思考内容增量）。
  * kind = 'segment'：一个并行分段处理完成（corrections 为该段产出条数）。
  */
 export interface ProofreadStreamPayload {
@@ -30,4 +30,6 @@ export interface ProofreadStreamPayload {
   label?: string
   text?: string
   corrections?: number
+  /** kind='chunk' 时为 true 表示该增量是思考内容（reasoning_content），而非正文输出 */
+  thinking?: boolean
 }

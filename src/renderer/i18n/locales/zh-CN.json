@@ -174,7 +174,8 @@
     "stream": {
       "charsReceived": "已接收 {count} 字",
       "suggestions": "完成，{count} 处建议",
-      "segmentClean": "完成，无修改"
+      "segmentClean": "完成，无修改",
+      "thinking": "思考中"
     },
     "proofMode": {
       "label": "校对粒度",
@@ -535,6 +536,14 @@
     "enableLimit": "开启限制",
     "timeoutLabel": "单请求超时（秒）",
     "timeoutHint": "超时的分片按失败处理，默认 300 秒"
+  },
+  "thinking": {
+    "title": "深度思考",
+    "description": "控制 OpenAI 兼容接口（DeepSeek、豆包、GLM 等）的思维链开关。注意：部分服务商默认开启思考（如 DeepSeek），思考 token 照常计费",
+    "modeDefault": "跟随服务商默认",
+    "modeEnabled": "开启思考",
+    "modeDisabled": "关闭思考",
+    "hint": "开启后校对进度条下方会滚动展示思维链；关闭可显著降低 token 消耗"
   },
   "concurrency": {
     "title": "并发设置",

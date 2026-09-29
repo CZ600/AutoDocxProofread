@@ -26,6 +26,11 @@ describe('i18n 批次3新增文案（失败分片 / 导出未匹配 / 结果复�
       expect(i18n.global.t('apiSettings.reviewEnabledToast')).toBeTruthy()
       expect(i18n.global.t('rateLimit.timeoutLabel')).toBeTruthy()
       expect(i18n.global.t('rateLimit.timeoutHint')).toBeTruthy()
+      expect(i18n.global.t('proof.stream.thinking')).toBeTruthy()
+      expect(i18n.global.t('thinking.title')).toBeTruthy()
+      expect(i18n.global.t('thinking.modeDefault')).toBeTruthy()
+      expect(i18n.global.t('thinking.modeEnabled')).toBeTruthy()
+      expect(i18n.global.t('thinking.modeDisabled')).toBeTruthy()
     }
     i18n.global.locale.value = 'zh-CN'
   })

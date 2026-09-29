@@ -174,7 +174,8 @@
     "stream": {
       "charsReceived": "{count} chars received",
       "suggestions": "Done, {count} suggestions",
-      "segmentClean": "Done, no changes"
+      "segmentClean": "Done, no changes",
+      "thinking": "Thinking"
     },
     "proofMode": {
       "label": "Granularity",
@@ -535,6 +536,14 @@
     "enableLimit": "Enable Limit",
     "timeoutLabel": "Per-request timeout (seconds)",
     "timeoutHint": "Timed-out segments are treated as failed; default 300s"
+  },
+  "thinking": {
+    "title": "Deep Thinking",
+    "description": "Controls the reasoning (thinking) switch for OpenAI-compatible APIs (DeepSeek, Doubao, GLM, etc.). Note: some providers enable thinking by default (e.g. DeepSeek) and thinking tokens are billed",
+    "modeDefault": "Follow provider default",
+    "modeEnabled": "Enable thinking",
+    "modeDisabled": "Disable thinking",
+    "hint": "When enabled, the chain of thought is streamed below the progress bar; disabling it significantly reduces token usage"
   },
   "concurrency": {
     "title": "Concurrency Settings",

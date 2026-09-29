@@ -58,9 +58,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
     parallel?: number,
     TimeLimit?: number | null,
     provider?: string,
-    requestTimeoutSec?: number | null
+    requestTimeoutSec?: number | null,
+    thinkingMode?: string
   ) =>
-    ipcRenderer.invoke('selectAPISetting', url, key, modelName, parallel, TimeLimit, provider, requestTimeoutSec),
+    ipcRenderer.invoke(
+      'selectAPISetting',
+      url,
+      key,
+      modelName,
+      parallel,
+      TimeLimit,
+      provider,
+      requestTimeoutSec,
+      thinkingMode || 'default'
+    ),
   getAPISettings: () => ipcRenderer.invoke('get-api-settings', {}),
   // 文档校对处理函数
   processDocx: (

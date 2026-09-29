@@ -3,7 +3,7 @@ import { dialog } from 'electron'
 import * as path from 'path'
 import { DB } from './database'
 import { maskKey } from './apiKeyCrypto'
-import { testAPI, testAPIWithProvider, setRequestTimeoutMs } from './chat'
+import { testAPI, testAPIWithProvider, setRequestTimeoutMs, setThinkingMode, ChatThinkingMode } from './chat'
 import { shouldRunReview } from './reviewGate'
 import { ModelProvider, getProviderBaseURL, requiresBaseURL } from '../shared/modelProviders'
 import {
@@ -57,6 +57,8 @@ export interface apiSettings {
   requestsPerMinute?: number | null
   /** 单请求超时（秒），null 表示使用 chat.ts 的默认值 */
   requestTimeoutSec?: number | null
+  /** 思考模式：default 跟随服务商默认（注意 DeepSeek 默认开思考），enabled/disabled 显式控制 */
+  thinkingMode?: ChatThinkingMode
 }
 
 export interface ProxySettings {
@@ -71,7 +73,8 @@ const api_info: apiSettings = {
   provider: ModelProvider.OPENAI_COMPATIBLE,
   parallel: 30,
   requestsPerMinute: null,
-  requestTimeoutSec: null
+  requestTimeoutSec: null,
+  thinkingMode: 'default'
 }
 
 // 解析审核阶段使用的模型：显式选择了审核模型则用之（查库失败回退校对模型），否则用校对模型
@@ -284,7 +287,8 @@ export const registerIpcHandlers = () => {
       parallel = 30,
       requestsPerMinute = null,
       provider = ModelProvider.OPENAI_COMPATIBLE,
-      requestTimeoutSec = null
+      requestTimeoutSec = null,
+      thinkingMode: ChatThinkingMode = 'default'
     ) => {
       api_info.apiKey = Key
       api_info.apiURL = URL
@@ -294,7 +298,8 @@ export const registerIpcHandlers = () => {
       // 历史参数名 TimeLimit 实际语义是「每分钟请求数上限」，已按语义更名
       api_info.requestsPerMinute = requestsPerMinute
       api_info.requestTimeoutSec = requestTimeoutSec
-      console.log('Selected API:', URL, maskKey(Key), modelName, parallel, requestsPerMinute, provider, requestTimeoutSec)
+      api_info.thinkingMode = thinkingMode === 'enabled' || thinkingMode === 'disabled' ? thinkingMode : 'default'
+      console.log('Selected API:', URL, maskKey(Key), modelName, parallel, requestsPerMinute, provider, requestTimeoutSec, api_info.thinkingMode)
       return true
     }
   )
@@ -307,7 +312,8 @@ export const registerIpcHandlers = () => {
       provider: api_info.provider,
       parallel: api_info.parallel || 30,
       requestsPerMinute: api_info.requestsPerMinute,
-      requestTimeoutSec: api_info.requestTimeoutSec
+      requestTimeoutSec: api_info.requestTimeoutSec,
+      thinkingMode: api_info.thinkingMode
     }
   })
 
@@ -358,6 +364,8 @@ export const registerIpcHandlers = () => {
         console.info('requests per minute limit is:', requestsPerMinute)
         // 单请求超时（秒→毫秒）：透传给 chat.ts 的客户端构造，null 恢复默认
         setRequestTimeoutMs(api_info.requestTimeoutSec != null ? api_info.requestTimeoutSec * 1000 : null)
+        // 思考模式：透传给 OpenAI 兼容路径的请求体（thinking.type）
+        setThinkingMode(api_info.thinkingMode ?? 'default')
 
         if (!Model || !filePath) {
           return {

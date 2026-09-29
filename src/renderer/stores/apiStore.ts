@@ -15,6 +15,8 @@ interface ApiSettings {
   TimeLimit: number | null
   /** 单请求超时（秒），null 表示使用主进程默认值（300s） */
   requestTimeoutSec: number | null
+  /** 思考模式：default 跟随服务商默认 / enabled / disabled（DeepSeek 等兼容 thinking 参数的服务） */
+  thinkingMode: 'default' | 'enabled' | 'disabled'
 }
 
 interface ApiSettingItem {
@@ -41,7 +43,8 @@ const defaultApiSettings: ApiSettings = {
   time: '',
   parallel: 30,
   TimeLimit: null,
-  requestTimeoutSec: null
+  requestTimeoutSec: null,
+  thinkingMode: 'default'
 }
 
 // 审核模型 ID（null 表示与校对模型一致）

@@ -132,7 +132,8 @@ export default interface ElectronApi {
     parallel?: number,
     TimeLimit?: number | null,
     provider?: string,
-    requestTimeoutSec?: number | null
+    requestTimeoutSec?: number | null,
+    thinkingMode?: 'default' | 'enabled' | 'disabled'
   ) => Promise<boolean>
 
   // 文档处理接口

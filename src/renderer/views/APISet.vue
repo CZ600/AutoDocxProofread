@@ -24,6 +24,7 @@
             <TokenStatistics />
             <ConcurrencySettings />
             <RateLimitSettings />
+            <ThinkingSettings />
             <ProxySettings />
           </div>
 
@@ -117,6 +118,7 @@ import AddApiDialog from '../components/api/AddApiDialog.vue'
 import TokenStatistics from '../components/api/TokenStatistics.vue'
 import ConcurrencySettings from '../components/api/ConcurrencySettings.vue'
 import RateLimitSettings from '../components/api/RateLimitSettings.vue'
+import ThinkingSettings from '../components/api/ThinkingSettings.vue'
 import ProxySettings from '../components/api/ProxySettings.vue'
 import PromptSettingsPanel from '../components/prompt/PromptSettingsPanel.vue'
 import { useApiSettings, type ApiFormData } from '../composables/useApiSettings'

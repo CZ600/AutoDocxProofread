@@ -100,6 +100,14 @@
             </el-button>
             <span v-else class="inline-progress-cancelling">{{ t('proof.progress.cancelling') }}</span>
           </div>
+          <!-- 思考模式开启时：滚动展示模型思维链增量（仅收到过思考内容才出现） -->
+          <div v-if="thinkingText" ref="thinkingBoxRef" class="inline-thinking-box">
+            <div class="inline-thinking-header">
+              <el-icon><ChatDotRound /></el-icon>
+              <span>{{ t('proof.stream.thinking') }}</span>
+            </div>
+            <div class="inline-thinking-content">{{ thinkingText }}</div>
+          </div>
         </transition>
 
         <div class="button-group">
@@ -358,7 +366,7 @@ import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useRepositoryStore } from '../stores/repositoryStore'
 import { useApiStore } from '../stores/apiStore'
 import { useRecentFilesStore, formatRelativeTime } from '../stores/recentFilesStore'
-import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download } from '@element-plus/icons-vue'
+import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download, ChatDotRound } from '@element-plus/icons-vue'
 import { useDark } from '@vueuse/core'
 import { requiresBaseURL } from '../../shared/modelProviders'
 import {
@@ -390,6 +398,19 @@ const progressDialogVisible = ref(false)
 const progressPercent = ref(0)
 const progressStage = ref('splitting')
 const progressDetail = ref('')
+// 思考内容滚动展示：append 思维链增量，超长时仅保留尾部，容器自动滚到底部
+const thinkingText = ref('')
+const thinkingBoxRef = ref<HTMLElement | null>(null)
+const THINKING_DISPLAY_MAX_CHARS = 4000
+
+const appendThinkingText = text => {
+  if (!text) return
+  thinkingText.value = (thinkingText.value + text).slice(-THINKING_DISPLAY_MAX_CHARS)
+  nextTick(() => {
+    const el = thinkingBoxRef.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
 // 单次大请求模式（polish）没有可靠的百分比数据，进度条以流动动画表达进行中
 const progressIndeterminate = ref(false)
 const progressBarColor = [
@@ -823,6 +844,7 @@ const resetProgressState = () => {
   streamTotalChars.value = 0
   latestSegment.value = null
   cancelRequested.value = false
+  thinkingText.value = ''
 }
 
 const openProgressDialog = mode => {
@@ -892,6 +914,11 @@ const tickerLine = computed(() =>
 const handleProofreadStream = payload => {
   if (!processing.value) return
   if (payload.kind === 'chunk') {
+    if (payload.thinking) {
+      // 思维链增量：只进思考展示框，不计入正文接收字数
+      appendThinkingText(payload.text || '')
+      return
+    }
     streamTotalChars.value += (payload.text || '').length
   } else if (payload.kind === 'segment') {
     latestSegment.value = {
@@ -1184,7 +1211,8 @@ const onSubmit = async () => {
       parallel,
       timeLimit_,
       provider,
-      apiSettingsStore.selectedApi.requestTimeoutSec ?? null
+      apiSettingsStore.selectedApi.requestTimeoutSec ?? null,
+      apiSettingsStore.selectedApi.thinkingMode || 'default'
     )
 
     let results
@@ -1715,6 +1743,20 @@ html.dark .preview-container hr {
   border-color: #2c2e30 !important;
 }
 
+html.dark .inline-thinking-box {
+  border-color: #2c2e30;
+  background: #1a1a1a;
+}
+
+html.dark .inline-thinking-header {
+  color: #8ec5ff;
+  border-bottom-color: #2c2e30;
+}
+
+html.dark .inline-thinking-content {
+  color: #8a8a8a;
+}
+
 html.dark .inline-progress-line {
   color: #8ec5ff;
 }
@@ -1772,6 +1814,7 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
 
 .inline-progress-container {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   flex: 1;
@@ -1779,6 +1822,38 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
   min-width: 300px;
   transition: all 0.3s ease;
   -webkit-app-region: no-drag;
+}
+
+/* 思考内容滚动展示框：进度条下方全宽，收到思维链增量时出现 */
+.inline-thinking-box {
+  flex-basis: 100%;
+  margin-top: 6px;
+  border: 1px solid #e4e9ef;
+  border-radius: 6px;
+  background: #f7f9fb;
+  overflow: hidden;
+}
+
+.inline-thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #7b9eb8;
+  border-bottom: 1px solid #e4e9ef;
+}
+
+.inline-thinking-content {
+  max-height: 120px;
+  overflow-y: auto;
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #8a94a0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* 状态行与详细信息行的滚动交替显示区：文字右对齐紧贴进度条，

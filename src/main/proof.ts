@@ -99,7 +99,8 @@ async function callModelAPI(
   apiURL: string,
   provider?: ModelProvider,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   const actualProvider = provider || ModelProvider.OPENAI_COMPATIBLE
 
@@ -111,10 +112,10 @@ async function callModelAPI(
   detectProviderURLMismatch(actualProvider, apiURL, modelName)
 
   if (actualProvider === ModelProvider.OPENAI_COMPATIBLE) {
-    return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+    return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
   }
 
-  return await getModelResponse(actualProvider, systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal)
+  return await getModelResponse(actualProvider, systemPrompt, userPrompt, apiKey, modelName, apiURL, onChunk, signal, onThinking)
 }
 
 // ====== 校对取消令牌 ======
@@ -167,6 +168,8 @@ export function createProofreadCancelToken(): ProofreadCancelToken {
  */
 export interface ProofreadStreamSink {
   chunk(stage: ProofreadStreamStage, index: number, label: string, text: string): void
+  /** 思考内容（reasoning_content）增量：与正文 chunk 分流，渲染端单独展示 */
+  thinking(stage: ProofreadStreamStage, index: number, label: string, text: string): void
   segment(stage: ProofreadStreamStage, index: number, label: string, corrections: number): void
   flush(): void
 }
@@ -179,7 +182,7 @@ export function createStreamSink(onStream?: (payload: ProofreadStreamPayload) =>
 
   const buffers = new Map<
     string,
-    { stage: ProofreadStreamStage; index: number; label: string; text: string }
+    { stage: ProofreadStreamStage; index: number; label: string; text: string; thinking: boolean }
   >()
   const lastSentAt = new Map<string, number>()
 
@@ -196,23 +199,37 @@ export function createStreamSink(onStream?: (payload: ProofreadStreamPayload) =>
     if (!buf) return
     buffers.delete(key)
     lastSentAt.set(key, Date.now())
-    send({ kind: 'chunk', stage: buf.stage, index: buf.index, label: buf.label, text: buf.text })
+    send({
+      kind: 'chunk',
+      stage: buf.stage,
+      index: buf.index,
+      label: buf.label,
+      text: buf.text,
+      thinking: buf.thinking || undefined
+    })
   }
 
+  // 正文与思考增量使用同一套节流缓冲，键上以 :thinking 后缀隔离
+  const makeIngest = (isThinking: boolean) => (stage: ProofreadStreamStage, index: number, label: string, text: string) => {
+    if (!text) return
+    const key = `${stage}:${index}${isThinking ? ':thinking' : ''}`
+    const buf = buffers.get(key) || { stage, index, label: label || '', text: '', thinking: isThinking }
+    if (label) buf.label = label
+    buf.text += text
+    buffers.set(key, buf)
+    const now = Date.now()
+    const last = lastSentAt.get(key) || 0
+    if (buf.text.length >= STREAM_FLUSH_CHARS || now - last >= STREAM_FLUSH_INTERVAL_MS) {
+      flushKey(key)
+    }
+  }
+
+  const ingestChunk = makeIngest(false)
+  const ingestThinking = makeIngest(true)
+
   return {
-    chunk(stage, index, label, text) {
-      if (!text) return
-      const key = `${stage}:${index}`
-      const buf = buffers.get(key) || { stage, index, label: label || '', text: '' }
-      if (label) buf.label = label
-      buf.text += text
-      buffers.set(key, buf)
-      const now = Date.now()
-      const last = lastSentAt.get(key) || 0
-      if (buf.text.length >= STREAM_FLUSH_CHARS || now - last >= STREAM_FLUSH_INTERVAL_MS) {
-        flushKey(key)
-      }
-    },
+    chunk: ingestChunk,
+    thinking: ingestThinking,
     segment(stage, index, label, corrections) {
       // 先刷出该分段尚未发送的增量文本，保证渲染端先看到文本再看到完成标记
       flushKey(`${stage}:${index}`)
@@ -968,7 +985,8 @@ async function summarizeDocumentTheme(
   apiURL: string,
   provider?: ModelProvider,
   onChunk?: OnChunk,
-  cancelToken?: ProofreadCancelToken | null
+  cancelToken?: ProofreadCancelToken | null,
+  onThinking?: OnChunk
 ): Promise<{
   result: string
   total_tokens: number
@@ -977,7 +995,7 @@ async function summarizeDocumentTheme(
   const userPrompt = buildLocalizedThemeUserPrompt(docStructure.title, docStructure.sections)
 
   try {
-    return await callModelAPI(systemPrompt, userPrompt, apiKey, modelName, apiURL, provider, onChunk, cancelToken?.signal)
+    return await callModelAPI(systemPrompt, userPrompt, apiKey, modelName, apiURL, provider, onChunk, cancelToken?.signal, onThinking)
   } catch (error) {
     // 取消不属于"主题总结失败"：向上传播，让整个校对流程终止
     if (cancelToken?.cancelled) throw new ProofreadCancelledError()
@@ -1266,7 +1284,8 @@ async function proofreadTextWithRAG(
   embeddingConfig?: ApiSettings,
   provider?: ModelProvider,
   onChunk?: OnChunk,
-  cancelToken?: ProofreadCancelToken | null
+  cancelToken?: ProofreadCancelToken | null,
+  onThinking?: OnChunk
 ): Promise<{ result: ProofreadingCorrection[]; use_tokens: number }> {
   try {
     let systemPrompt = systemContext
@@ -1286,7 +1305,8 @@ async function proofreadTextWithRAG(
         apiURL,
         provider,
         onChunk,
-        cancelToken?.signal
+        cancelToken?.signal,
+        onThinking
       )
       if (cancelToken?.cancelled) throw new ProofreadCancelledError()
       return { result: parseCorrections(result), use_tokens: total_tokens }
@@ -1326,7 +1346,8 @@ async function proofreadTextWithRAG(
         apiURL,
         provider,
         onChunk,
-        cancelToken?.signal
+        cancelToken?.signal,
+        onThinking
       )
       if (cancelToken?.cancelled) throw new ProofreadCancelledError()
       return { result: parseCorrections(result, ragChunks), use_tokens: total_tokens }
@@ -1448,7 +1469,8 @@ export async function proofreadDocument(
       apiURL,
       provider,
       chunk => streamSink?.chunk('theme', 0, '', chunk),
-      cancelToken
+      cancelToken,
+      chunk => streamSink?.thinking('theme', 0, '', chunk)
     )
     cancelToken?.throwIfCancelled()
     const nonEmptySections = getSectionsForProofreading(docStructure.sections)
@@ -1487,7 +1509,8 @@ export async function proofreadDocument(
             embeddingConfig,
             provider,
             chunk => streamSink?.chunk('proofread', sectionIndex, sectionLabel, chunk),
-            cancelToken
+            cancelToken,
+            chunk => streamSink?.thinking('proofread', sectionIndex, sectionLabel, chunk)
           )
           streamSink?.segment('proofread', sectionIndex, sectionLabel, sectionResult.result.length)
           return sectionResult
@@ -1563,7 +1586,8 @@ export async function proofreadDocument(
                 embeddingConfig,
                 provider,
                 chunk => streamSink?.chunk('proofread', index, label, chunk),
-                cancelToken
+                cancelToken,
+                chunk => streamSink?.thinking('proofread', index, label, chunk)
               )
               streamSink?.segment('proofread', index, label, sentenceResult.result.length)
               return sentenceResult
@@ -1851,7 +1875,8 @@ export async function reduceAIDetectionDocument(
           apiURL,
           provider,
           chunk => streamSink?.chunk('reduce', index, paraLabel, chunk),
-          cancelToken?.signal
+          cancelToken?.signal,
+          chunk => streamSink?.thinking('reduce', index, paraLabel, chunk)
         )
         if (cancelToken?.cancelled) throw new ProofreadCancelledError()
         let rewritten = cleanAIResponse(result)
@@ -1999,7 +2024,8 @@ export async function reviewCorrections(
         apiURL,
         provider,
         chunk => streamSink?.chunk('review', batchIdx, `#${batchIdx + 1}`, chunk),
-        cancelToken?.signal
+        cancelToken?.signal,
+        chunk => streamSink?.thinking('review', batchIdx, `#${batchIdx + 1}`, chunk)
       )
       cancelToken?.throwIfCancelled()
       totalTokens += total_tokens
@@ -2060,7 +2086,8 @@ export async function reviewCorrections(
     apiURL,
     provider,
     chunk => streamSink?.chunk('review', 0, '#1', chunk),
-    cancelToken?.signal
+    cancelToken?.signal,
+    chunk => streamSink?.thinking('review', 0, '#1', chunk)
   )
   cancelToken?.throwIfCancelled()
   totalTokens = total_tokens

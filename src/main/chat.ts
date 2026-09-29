@@ -44,6 +44,23 @@ export function setRequestTimeoutMs(timeoutMs: number | null): void {
 // 避免每次请求都重新构造客户端。maxRetries=2 利用 SDK 自带的 429/5xx 指数退避。
 const clientCache = new Map<string, unknown>()
 
+// ====== 思考模式（DeepSeek / 豆包 / GLM 等兼容 thinking 参数的 OpenAI 兼容服务） ======
+export type ChatThinkingMode = 'default' | 'enabled' | 'disabled'
+let currentThinkingMode: ChatThinkingMode = 'default'
+
+/**
+ * 设置思考模式。'default' 不传 thinking 参数（跟随服务商默认——注意
+ * DeepSeek 等服务默认开启思考）；'enabled'/'disabled' 显式传 thinking.type。
+ */
+export function setThinkingMode(mode: ChatThinkingMode): void {
+  currentThinkingMode = mode === 'enabled' || mode === 'disabled' ? mode : 'default'
+}
+
+function buildThinkingBodyParam(): { thinking: { type: ChatThinkingMode } } | null {
+  if (currentThinkingMode === 'default') return null
+  return { thinking: { type: currentThinkingMode } }
+}
+
 function getOpenAIClient(apiKey: string, baseURL?: string): OpenAI {
   const cacheKey = `openai|${baseURL || ''}|${apiKey}|${currentRequestTimeoutMs}`
   const cached = clientCache.get(cacheKey)
@@ -213,7 +230,8 @@ export async function OpenaiGen(
   modelName: string,
   apiURL: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   if (!apiKey) {
     throw new Error('API key is missing. Please provide a valid API key.')
@@ -226,6 +244,9 @@ export async function OpenaiGen(
 
   try {
     const openai = getOpenAIClient(apiKey, apiURL)
+    // 思考模式参数：DeepSeek / 豆包 / GLM 等兼容 thinking.type；其他服务对未知字段一般忽略。
+    // 仅在用户显式选择开/关时附带，default 不传以保持各服务商自己的默认行为。
+    const thinkingParam = buildThinkingBodyParam()
 
     if (onChunk) {
       // 流式路径：include_usage 让服务端在最后一个 chunk 携带 token 用量。
@@ -240,7 +261,8 @@ export async function OpenaiGen(
               { role: 'user', content: userPrompt }
             ],
             stream: true,
-            stream_options: { include_usage: true }
+            stream_options: { include_usage: true },
+            ...(thinkingParam || {})
           },
           signal ? { signal } : undefined
         )) as unknown as AsyncIterable<any>
@@ -248,6 +270,11 @@ export async function OpenaiGen(
         let result = ''
         let total_tokens = 0
         for await (const chunk of stream) {
+          // 思考模式：思维链走独立的 delta.reasoning_content，与正文增量分流
+          const reasoning = chunk?.choices?.[0]?.delta?.reasoning_content
+          if (reasoning && onThinking) {
+            onThinking(reasoning)
+          }
           const delta = chunk?.choices?.[0]?.delta?.content || ''
           if (delta) {
             result += delta
@@ -277,7 +304,8 @@ export async function OpenaiGen(
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
-        ]
+        ],
+        ...(thinkingParam || {})
       },
       signal ? { signal } : undefined
     )
@@ -877,7 +905,8 @@ export async function getModelResponse(
   modelName: string,
   customBaseURL?: string,
   onChunk?: OnChunk,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
   switch (provider) {
     case ModelProvider.ANTHROPIC:
@@ -915,7 +944,8 @@ export async function getModelResponse(
       if (!customBaseURL) {
         throw new Error('Custom base URL is required for OpenAI compatible provider')
       }
-      return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal)
+      // 思考模式与思维链流式回调目前仅在 OpenAI 兼容路径支持
+      return await OpenaiGen(systemPrompt, userPrompt, apiKey, modelName, customBaseURL, onChunk, signal, onThinking)
   }
 }
 
