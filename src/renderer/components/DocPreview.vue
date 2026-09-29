@@ -54,22 +54,6 @@
               {{ fileName.length > 18 ? fileName.slice(0, 18) + '...' : fileName }}
             </span>
           </el-tooltip>
-
-          <template v-if="selectRepository.length > 0">
-            <el-tag
-              v-for="item in selectRepository"
-              :key="item"
-              type="success"
-              size="small"
-              closable
-              :disable-transitions="false"
-              @close="deleteSelectRepository(item)"
-            >{{ item }}</el-tag
-            >
-            <el-button type="danger" size="small" text @click="deleteAllSelectRepository">{{
-              t('proof.clear')
-            }}</el-button>
-          </template>
         </div>
 
         <transition name="inline-progress-fade">
@@ -221,8 +205,19 @@
                       <el-icon class="kb-dropdown-title-icon"><Collection /></el-icon>
                       {{ t('proof.selectKnowledge') }}
                     </span>
-                    <span v-if="selectRepository.length > 0" class="kb-dropdown-selected-count">
-                      {{ t('proof.kbSelectedCount', { count: selectRepository.length }) }}
+                    <span class="kb-dropdown-header-actions">
+                      <span v-if="selectRepository.length > 0" class="kb-dropdown-selected-count">
+                        {{ t('proof.kbSelectedCount', { count: selectRepository.length }) }}
+                      </span>
+                      <el-button
+                        v-if="selectRepository.length > 0"
+                        link
+                        size="small"
+                        class="kb-dropdown-clear"
+                        @click="deleteAllSelectRepository"
+                      >
+                        {{ t('proof.clear') }}
+                      </el-button>
                     </span>
                   </div>
                   <div class="kb-dropdown-list">
@@ -231,7 +226,7 @@
                       :key="value"
                       class="kb-dropdown-option"
                       :class="{ 'is-selected': selectRepository.includes(value) }"
-                      @click="addRepository(value)"
+                      @click="toggleRepository(value)"
                     >
                       <el-icon class="kb-option-check">
                         <Select v-if="selectRepository.includes(value)" />
@@ -355,7 +350,6 @@ import {
   ElDropdown,
   ElDropdownMenu,
   ElDropdownItem,
-  ElTag,
   ElIcon
 } from 'element-plus'
 import { renderAsync } from 'docx-preview'
@@ -737,6 +731,14 @@ function unique(arr) {
 const addRepository = async item => {
   selectRepository.value.push(item)
   selectRepository.value = unique(selectRepository.value)
+}
+
+const toggleRepository = item => {
+  if (selectRepository.value.includes(item)) {
+    deleteSelectRepository(item)
+  } else {
+    addRepository(item)
+  }
 }
 
 const deleteSelectRepository = async value => {
@@ -1786,6 +1788,15 @@ html.dark .kb-dropdown-title-icon {
   color: #8ec5ff;
 }
 
+html.dark .kb-dropdown-clear {
+  color: #a3716f;
+}
+
+html.dark .kb-dropdown-clear:hover {
+  color: #c28a8a;
+  background-color: transparent;
+}
+
 html.dark .kb-dropdown-option {
   color: #c0c4cc;
 }
@@ -1961,6 +1972,23 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
   border-radius: 10px;
   line-height: 1.4;
   white-space: nowrap;
+}
+
+.kb-dropdown-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.kb-dropdown-clear {
+  font-size: 12px;
+  color: #c28a8a;
+  padding: 2px 4px;
+}
+
+.kb-dropdown-clear:hover {
+  color: #b07575;
+  background-color: transparent;
 }
 
 .kb-dropdown-list {
@@ -2184,7 +2212,6 @@ html.dark .win-btn:active {
   flex-shrink: 0;
 }
 
-.file-info-container .el-tag,
 .file-info-container .el-button {
   -webkit-app-region: no-drag;
 }
