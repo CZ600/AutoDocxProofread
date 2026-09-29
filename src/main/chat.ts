@@ -53,8 +53,15 @@ let currentThinkingMode: ChatThinkingMode = 'default'
  * DeepSeek 等服务默认开启思考）；'enabled'/'disabled' 显式传 thinking.type。
  */
 export function setThinkingMode(mode: ChatThinkingMode): void {
-  currentThinkingMode = mode === 'enabled' || mode === 'disabled' ? mode : 'default'
+  const next = mode === 'enabled' || mode === 'disabled' ? mode : 'default'
+  if (next !== currentThinkingMode) {
+    console.log(`[chat] thinking mode set to: ${next}`)
+  }
+  currentThinkingMode = next
 }
+
+// 诊断标记：本次应用运行中是否收到过思维链增量（仅首次打印，避免逐句模式刷屏）
+let reasoningChunkSeen = false
 
 function buildThinkingBodyParam(): { thinking: { type: ChatThinkingMode } } | null {
   if (currentThinkingMode === 'default') return null
@@ -270,9 +277,17 @@ export async function OpenaiGen(
         let result = ''
         let total_tokens = 0
         for await (const chunk of stream) {
-          // 思考模式：思维链走独立的 delta.reasoning_content，与正文增量分流
-          const reasoning = chunk?.choices?.[0]?.delta?.reasoning_content
+          // 思考模式：思维链走独立的 delta.reasoning_content（部分服务如 OpenRouter 用 delta.reasoning）
+          const streamDelta = chunk?.choices?.[0]?.delta
+          const reasoning =
+            (typeof streamDelta?.reasoning_content === 'string' && streamDelta.reasoning_content) ||
+            (typeof streamDelta?.reasoning === 'string' && streamDelta.reasoning) ||
+            ''
           if (reasoning && onThinking) {
+            if (!reasoningChunkSeen) {
+              reasoningChunkSeen = true
+              console.log('[OpenaiGen] ✓ 收到思维链增量（服务端已返回 reasoning）')
+            }
             onThinking(reasoning)
           }
           const delta = chunk?.choices?.[0]?.delta?.content || ''
@@ -323,6 +338,20 @@ export async function OpenaiGen(
 
     const result = chatCompletion.choices[0]?.message?.content ?? ''
     const total_tokens = chatCompletion.usage?.total_tokens ?? 0
+
+    // 流式回退到非流式时（部分服务不支持 stream_options），思维链在 message 上一次性返回
+    const message = chatCompletion.choices[0]?.message as any
+    const wholeReasoning =
+      (typeof message?.reasoning_content === 'string' && message.reasoning_content) ||
+      (typeof message?.reasoning === 'string' && message.reasoning) ||
+      ''
+    if (wholeReasoning && onThinking) {
+      if (!reasoningChunkSeen) {
+        reasoningChunkSeen = true
+        console.log('[OpenaiGen] ✓ 非流式响应携带思维链（message.reasoning）')
+      }
+      onThinking(wholeReasoning)
+    }
 
     return { result, total_tokens }
   } catch (error) {

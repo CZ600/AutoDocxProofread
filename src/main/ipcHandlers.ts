@@ -366,6 +366,7 @@ export const registerIpcHandlers = () => {
         setRequestTimeoutMs(api_info.requestTimeoutSec != null ? api_info.requestTimeoutSec * 1000 : null)
         // 思考模式：透传给 OpenAI 兼容路径的请求体（thinking.type）
         setThinkingMode(api_info.thinkingMode ?? 'default')
+        console.info('thinking mode of this run is:', api_info.thinkingMode ?? 'default')
 
         if (!Model || !filePath) {
           return {
