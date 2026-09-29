@@ -543,7 +543,7 @@
     "modeDefault": "Follow provider default",
     "modeEnabled": "Enable thinking",
     "modeDisabled": "Disable thinking",
-    "hint": "When enabled, the chain of thought is streamed below the progress bar; disabling it significantly reduces token usage"
+    "hint": "When enabled, the chain of thought streams in the progress info area; disabling it significantly reduces token usage"
   },
   "concurrency": {
     "title": "Concurrency Settings",

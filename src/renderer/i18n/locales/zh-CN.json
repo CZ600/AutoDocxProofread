@@ -543,7 +543,7 @@
     "modeDefault": "跟随服务商默认",
     "modeEnabled": "开启思考",
     "modeDisabled": "关闭思考",
-    "hint": "开启后校对进度条下方会滚动展示思维链；关闭可显著降低 token 消耗"
+    "hint": "开启后进度信息区将滚动展示思维链内容；关闭可显著降低 token 消耗"
   },
   "concurrency": {
     "title": "并发设置",
