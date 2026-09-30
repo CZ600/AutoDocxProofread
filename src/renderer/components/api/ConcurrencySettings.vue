@@ -35,21 +35,6 @@ const handleParallelChange = (value: number) => {
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 .setting-body {
   padding: 4px 0;
 }
@@ -91,12 +76,6 @@ const handleParallelChange = (value: number) => {
   box-shadow: 0 1px 4px rgba(91, 124, 153, 0.25);
 }
 
-.setting-section {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: #ffffff;
-}
 </style>
 
 <style>

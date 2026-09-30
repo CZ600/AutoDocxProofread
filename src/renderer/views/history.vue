@@ -110,7 +110,7 @@
 
       <div v-if="pagedDetailCorrections.length > 0" class="correction-list">
         <div v-for="(item, idx) in pagedDetailCorrections" :key="idx" class="correction-row">
-          <span class="correction-row-type" :class="`type-${(item.type || '').toLowerCase()}`">
+          <span class="correction-row-type" :class="`type-${correctionTypeCssKey(item.type)}`">
             {{ typeLabel(item.type) }}
           </span>
           <div class="correction-row-body">
@@ -181,7 +181,7 @@
         <div class="compare-section">
           <div class="compare-section-title">{{ t('history.commonItems') }} · {{ compareData.common.length }}</div>
           <div v-for="(item, idx) in compareData.common.slice(0, 30)" :key="'c' + idx" class="correction-row">
-            <span class="correction-row-type" :class="`type-${(item.type || '').toLowerCase()}`">
+            <span class="correction-row-type" :class="`type-${correctionTypeCssKey(item.type)}`">
               {{ typeLabel(item.type) }}
             </span>
             <div class="correction-row-body">
@@ -199,7 +199,7 @@
         <div class="compare-section">
           <div class="compare-section-title">{{ t('history.onlyInA') }} · {{ compareData.onlyA.length }}</div>
           <div v-for="(item, idx) in compareData.onlyA.slice(0, 30)" :key="'a' + idx" class="correction-row">
-            <span class="correction-row-type" :class="`type-${(item.type || '').toLowerCase()}`">
+            <span class="correction-row-type" :class="`type-${correctionTypeCssKey(item.type)}`">
               {{ typeLabel(item.type) }}
             </span>
             <div class="correction-row-body">
@@ -215,7 +215,7 @@
         <div class="compare-section">
           <div class="compare-section-title">{{ t('history.onlyInB') }} · {{ compareData.onlyB.length }}</div>
           <div v-for="(item, idx) in compareData.onlyB.slice(0, 30)" :key="'b' + idx" class="correction-row">
-            <span class="correction-row-type" :class="`type-${(item.type || '').toLowerCase()}`">
+            <span class="correction-row-type" :class="`type-${correctionTypeCssKey(item.type)}`">
               {{ typeLabel(item.type) }}
             </span>
             <div class="correction-row-body">
@@ -247,6 +247,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Right } from '@element-plus/icons-vue'
 
 import { fileInfoStore } from '../stores/store'
+import { canonicalCorrectionType, correctionTypeCssKey, correctionTypeLabel } from '../../shared/correctionTypes'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -282,19 +283,7 @@ const baseName = (path: string) => (path || '').split('\\').pop().split('/').pop
 
 const rowLabel = (row: any) => `${row.created_at || ''} ${baseName(row.filePath) || ''}`.trim()
 
-const typeLabel = (type: string) => {
-  const map: Record<string, string> = {
-    Typo: t('proof.correctionTypes.Typo'),
-    Punctuation: t('proof.correctionTypes.Punctuation'),
-    Grammar: t('proof.correctionTypes.Grammar'),
-    Consistency: t('proof.correctionTypes.Consistency'),
-    wordError: t('proof.correctionTypes.wordError'),
-    ComprehensiveError: t('proof.correctionTypes.ComprehensiveError'),
-    polish: t('proof.correctionTypes.polish'),
-    reduceAI: t('proof.correctionTypes.reduceAI')
-  }
-  return map[type] || type
-}
+const typeLabel = (type: string) => correctionTypeLabel(type, t)
 
 /** 历史记录的 result 是校对结果数组的 JSON；兼容对象包裹 { corrections } 的旧数据 */
 const parseHistoryResult = (raw: string): any[] | null => {
@@ -336,10 +325,12 @@ watch(searchText, () => {
 })
 
 // ---- 详情 ----
+// 类型统计按规范英文 key 分组：中文变体与英文 key 并入同一统计，
+// 与 Proof/DocPreview 的分类口径一致
 const detailStats = computed(() => {
   const counts = new Map<string, number>()
   detailCorrections.value.forEach(item => {
-    const type = item.type || ''
+    const type = canonicalCorrectionType(item.type)
     counts.set(type, (counts.get(type) || 0) + 1)
   })
   return Array.from(counts.entries())
@@ -350,7 +341,7 @@ const detailStats = computed(() => {
 const filteredDetailCorrections = computed(() => {
   const query = detailSearch.value.trim().toLowerCase()
   return detailCorrections.value.filter(item => {
-    if (detailTypeFilter.value && (item.type || '') !== detailTypeFilter.value) return false
+    if (detailTypeFilter.value && canonicalCorrectionType(item.type) !== detailTypeFilter.value) return false
     if (!query) return true
     return (
       (item.original || '').toLowerCase().includes(query) ||
@@ -419,7 +410,7 @@ const restoreHistory = async (row: any) => {
 const statsOf = (list: any[]) => {
   const counts = new Map<string, number>()
   list.forEach(item => {
-    const type = item.type || ''
+    const type = canonicalCorrectionType(item.type)
     counts.set(type, (counts.get(type) || 0) + 1)
   })
   return counts
@@ -665,12 +656,11 @@ onMounted(() => {
   color: #4a6580;
 }
 
+/* 类型徽标配色已收敛到 common.css（批次 9），统计 chip 同样引用全局 type-* 色板 */
 .stat-chip {
   font-size: 12px;
   padding: 2px 10px;
   border-radius: 10px;
-  background: #f4f6f9;
-  color: #5a6a7a;
   cursor: pointer;
   border: 1px solid transparent;
   user-select: none;
@@ -715,14 +705,14 @@ onMounted(() => {
   border-bottom: none;
 }
 
+/* 类型徽标配色已收敛到 common.css（批次 9）；归一后的英文 key 必然命中色板，
+   基类不再设兜底背景/文字色以免 scoped 特异性压过全局色板 */
 .correction-row-type {
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
-  background: #f4f6f9;
-  color: #5a6a7a;
 }
 
 .correction-row-body {
@@ -902,39 +892,6 @@ onMounted(() => {
   font-size: 12px;
   color: #9aa4b1;
   text-align: center;
-}
-
-/* 类型徽标配色：与校对页 type-* 一致 */
-.type-typo,
-.type-worderror {
-  background: rgba(194, 138, 138, 0.16);
-  color: #a87070;
-}
-
-.type-punctuation {
-  background: rgba(194, 168, 106, 0.16);
-  color: #a08850;
-}
-
-.type-grammar {
-  background: rgba(123, 158, 184, 0.16);
-  color: #5b7c99;
-}
-
-.type-consistency {
-  background: rgba(138, 146, 158, 0.16);
-  color: #6a7380;
-}
-
-.type-comprehensiveerror,
-.type-polish {
-  background: rgba(138, 184, 158, 0.16);
-  color: #5a9070;
-}
-
-.type-reduceai {
-  background: rgba(160, 120, 200, 0.16);
-  color: #8a5ebf;
 }
 
 .morandi-dialog :deep(.el-dialog) {

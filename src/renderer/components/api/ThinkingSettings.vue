@@ -35,21 +35,6 @@ const handleChange = (value: 'default' | 'enabled' | 'disabled') => {
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 .setting-body {
   padding: 4px 0;
 }
@@ -83,12 +68,6 @@ const handleChange = (value: 'default' | 'enabled' | 'disabled') => {
   color: #9aa7b4;
 }
 
-.setting-section {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: #ffffff;
-}
 </style>
 
 <style>

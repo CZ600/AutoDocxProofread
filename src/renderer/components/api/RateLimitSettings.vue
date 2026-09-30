@@ -77,21 +77,6 @@ const handleTimeoutChange = (value: number | undefined) => {
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 .setting-body {
   padding: 4px 0;
 }

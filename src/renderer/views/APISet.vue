@@ -415,21 +415,6 @@ onMounted(async () => {
   }
 }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 /* 悬停提示图标：与 TokenStatistics 的提示符号同一配色 */
 .tooltip-icon {
   cursor: help;

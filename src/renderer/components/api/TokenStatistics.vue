@@ -36,21 +36,6 @@ const handleReset = () => {
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 .token-stats {
   display: flex;
   justify-content: space-between;
@@ -97,12 +82,6 @@ const handleReset = () => {
   background-color: #b07575;
 }
 
-.setting-section {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: #ffffff;
-}
 </style>
 
 <style>

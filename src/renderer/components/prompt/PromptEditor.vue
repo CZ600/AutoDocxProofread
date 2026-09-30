@@ -133,21 +133,6 @@ const handleReset = async () => {
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 .prompt-form {
   padding: 4px 0;
 }
@@ -270,13 +255,6 @@ const handleReset = async () => {
   color: #4a6580;
   border-color: #b8c7d4;
   background: #f4f6f9;
-}
-
-.setting-section {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: #ffffff;
 }
 
 @media (max-width: 768px) {

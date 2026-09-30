@@ -12,10 +12,9 @@ import {
   locateCorrectionsInPreview,
   replaceRangeWithSuggested
 } from './correctionMatching'
+import { correctionTypeCssKey } from '../../shared/correctionTypes'
 
-export const normalizeCorrectionType = type => {
-  return (type || '').toString().trim().toLowerCase()
-}
+export const normalizeCorrectionType = type => correctionTypeCssKey(type)
 
 /**
  * 把一个已定位的匹配区间包裹为高亮 span。

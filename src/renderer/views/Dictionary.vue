@@ -363,19 +363,16 @@ onMounted(async () => {
   padding: 16px 18px;
 }
 
+/* 基类（.section-header/.section-header .el-icon）见 common.css（批次 9），
+   这里仅保留与基类的差异项：两端对齐、更小的标题下距、图标随标题字号 */
 .section-header {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
   margin-bottom: 12px;
 }
 
 .section-header .el-icon {
   color: var(--brand);
+  font-size: inherit;
 }
 
 .repository-list {

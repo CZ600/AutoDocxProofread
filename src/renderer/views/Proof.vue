@@ -7,11 +7,11 @@
           :id="`error-item-${index}`"
           :key="index"
           :name="index"
-          :class="[`correction-item type-${(item.type || '').toLowerCase()}`, { 'correction-item-rejected': item.rejected }]"
+          :class="[`correction-item type-${correctionTypeCssKey(item.type)}`, { 'correction-item-rejected': item.rejected }]"
         >
           <template #title>
             <div class="correction-header" @click="scrollPreviewToCorrection(index)">
-              <span class="correction-type" :class="`type-${(item.type || '').toLowerCase()}`">
+              <span class="correction-type" :class="`type-${correctionTypeCssKey(item.type)}`">
                 {{ formatCorrectionType(item.type) }}
               </span>
               <span v-if="item.rejected" class="correction-rejected-tag">{{ t('proof.rejectedTag') }}</span>
@@ -136,6 +136,7 @@ import {
   unwrapHighlight
 } from '../utils/highlight'
 import { forceVisibleSection } from '../utils/previewPerf'
+import { correctionTypeCssKey, correctionTypeLabel } from '../../shared/correctionTypes'
 
 const previewContainer = inject('previewContainer')
 const fileStore = fileInfoStore()
@@ -223,19 +224,7 @@ const unignoreCorrection = index => {
   ElMessage.success(t('proof.messages.unignored'))
 }
 
-const formatCorrectionType = type => {
-  const typeMap = {
-    Typo: t('proof.correctionTypes.Typo'),
-    Punctuation: t('proof.correctionTypes.Punctuation'),
-    Grammar: t('proof.correctionTypes.Grammar'),
-    Consistency: t('proof.correctionTypes.Consistency'),
-    wordError: t('proof.correctionTypes.wordError'),
-    ComprehensiveError: t('proof.correctionTypes.ComprehensiveError'),
-    polish: t('proof.correctionTypes.polish'),
-    reduceAI: t('proof.correctionTypes.reduceAI')
-  }
-  return typeMap[type] || type
-}
+const formatCorrectionType = type => correctionTypeLabel(type, t)
 
 // 高亮重建收敛到 utils/highlight.js（与右侧预览共用同一实现）；
 // 本列表的高亮点击回到侧栏聚焦
@@ -428,110 +417,8 @@ onUnmounted(() => {
 </script>
 
 <style>
-.highlight-correction {
-  --highlight-bg: rgba(255, 214, 102, 0.5);
-  --highlight-bg-hover: rgba(255, 214, 102, 0.7);
-  --highlight-bg-focus: rgba(255, 214, 102, 0.92);
-  --highlight-border: #ffb300;
-  --highlight-ring: rgba(255, 179, 0, 0.28);
-  background-color: var(--highlight-bg) !important;
-  border-bottom: 2px solid var(--highlight-border) !important;
-  cursor: pointer !important;
-  padding: 1px 3px !important;
-  border-radius: 3px !important;
-  transition: all 0.2s ease !important;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--highlight-border) 28%, transparent) !important;
-}
-
-.highlight-correction:hover {
-  box-shadow: 0 0 0 3px var(--highlight-ring) !important;
-  background-color: var(--highlight-bg-hover) !important;
-  transform: translateY(-1px) !important;
-}
-
-.highlight-correction-focused {
-  background-color: var(--highlight-bg-focus) !important;
-  animation: correction-highlight-pulse 0.8s ease-in-out 3 !important;
-}
-
-.highlight-type-typo,
-.highlight-type-worderror,
-.highlight-type-错别字 {
-  --highlight-bg: rgba(245, 108, 108, 0.24);
-  --highlight-bg-hover: rgba(245, 108, 108, 0.34);
-  --highlight-bg-focus: rgba(245, 108, 108, 0.48);
-  --highlight-border: #e36262;
-  --highlight-ring: rgba(245, 108, 108, 0.32);
-}
-
-.highlight-type-punctuation,
-.highlight-type-标点 {
-  --highlight-bg: rgba(230, 162, 60, 0.24);
-  --highlight-bg-hover: rgba(230, 162, 60, 0.34);
-  --highlight-bg-focus: rgba(230, 162, 60, 0.48);
-  --highlight-border: #d89020;
-  --highlight-ring: rgba(230, 162, 60, 0.3);
-}
-
-.highlight-type-grammar,
-.highlight-type-语法 {
-  --highlight-bg: rgba(64, 158, 255, 0.24);
-  --highlight-bg-hover: rgba(64, 158, 255, 0.34);
-  --highlight-bg-focus: rgba(64, 158, 255, 0.48);
-  --highlight-border: #3a8ee6;
-  --highlight-ring: rgba(64, 158, 255, 0.32);
-}
-
-.highlight-type-consistency,
-.highlight-type-一致性 {
-  --highlight-bg: rgba(144, 147, 152, 0.24);
-  --highlight-bg-hover: rgba(144, 147, 152, 0.34);
-  --highlight-bg-focus: rgba(144, 147, 152, 0.48);
-  --highlight-border: #828282;
-  --highlight-ring: rgba(144, 147, 152, 0.3);
-}
-
-.highlight-type-comprehensiveerror,
-.highlight-type-polish,
-.highlight-type-综合错误,
-.highlight-type-润色建议 {
-  --highlight-bg: rgba(103, 194, 58, 0.24);
-  --highlight-bg-hover: rgba(103, 194, 58, 0.34);
-  --highlight-bg-focus: rgba(103, 194, 58, 0.48);
-  --highlight-border: #5baa3a;
-  --highlight-ring: rgba(103, 194, 58, 0.3);
-}
-
-.highlight-type-reduceai,
-.highlight-type-ai率降低 {
-  --highlight-bg: rgba(160, 120, 200, 0.24);
-  --highlight-bg-hover: rgba(160, 120, 200, 0.34);
-  --highlight-bg-focus: rgba(160, 120, 200, 0.48);
-  --highlight-border: #9b6dc6;
-  --highlight-ring: rgba(160, 120, 200, 0.3);
-}
-
-@keyframes correction-highlight-pulse {
-  0% {
-    box-shadow:
-      0 0 0 0 var(--highlight-ring),
-      0 1px 3px color-mix(in srgb, var(--highlight-border) 28%, transparent);
-    transform: translateY(0);
-  }
-  50% {
-    box-shadow:
-      0 0 0 7px color-mix(in srgb, var(--highlight-border) 16%, transparent),
-      0 0 18px color-mix(in srgb, var(--highlight-border) 34%, transparent);
-    transform: translateY(-1px);
-  }
-  100% {
-    box-shadow:
-      0 0 0 0 var(--highlight-ring),
-      0 1px 3px color-mix(in srgb, var(--highlight-border) 28%, transparent);
-    transform: translateY(0);
-  }
-}
-
+/* 预览高亮与类型色板已收敛到 assets/css/common.css（批次 9）；
+   这里仅保留本视图特有的列表样式与暗色适配。 */
 .correction-item.correction-item-focused {
   box-shadow: 0 0 0 2px rgba(142, 197, 255, 0.7) !important;
   animation: correction-item-pulse 0.8s ease-in-out 3 !important;
@@ -891,92 +778,5 @@ html.dark .el-collapse-item__header.is-active {
   padding: 20px;
   text-align: center;
   color: #8a929e;
-}
-
-.category-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-}
-
-.category-typo,
-.category-worderror,
-.category-错别字 {
-  background-color: #c28a8a;
-}
-
-.category-punctuation,
-.category-标点 {
-  background-color: #c2a86a;
-}
-
-.category-grammar,
-.category-语法 {
-  background-color: var(--brand);
-}
-
-.category-consistency,
-.category-一致性 {
-  background-color: #8a929e;
-}
-
-.category-comprehensiveerror,
-.category-综合错误,
-.category-polish,
-.category-润色建议 {
-  background-color: #8ab89e;
-}
-
-.category-reduceai,
-.category-ai率降低 {
-  background-color: #9b6dc6;
-}
-
-.type-typo,
-.type-错别字,
-.type-worderror {
-  background-color: rgba(194, 138, 138, 0.14);
-  color: #a87070;
-  border: none;
-}
-
-.type-punctuation,
-.type-标点 {
-  background-color: rgba(194, 168, 106, 0.14);
-  color: #a08850;
-  border: none;
-}
-
-.type-grammar,
-.type-语法 {
-  background-color: rgba(123, 158, 184, 0.14);
-  color: #5b7c99;
-  border: none;
-}
-
-.type-consistency,
-.type-一致性 {
-  background-color: rgba(138, 146, 158, 0.14);
-  color: #6a7380;
-  border: none;
-}
-
-.type-comprehensiveerror,
-.type-综合错误,
-.type-polish,
-.type-润色建议 {
-  background-color: rgba(138, 184, 158, 0.14);
-  color: #5a9070;
-  border: none;
-}
-
-.type-reduceai,
-.type-ai率降低 {
-  background-color: rgba(160, 120, 200, 0.14);
-  color: #8a5ebf;
-  border: none;
 }
 </style>

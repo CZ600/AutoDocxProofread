@@ -367,6 +367,7 @@ import {
   highlightCorrections as rebuildPreviewHighlights
 } from '../utils/highlight'
 import { applyPreviewPerfHints } from '../utils/previewPerf'
+import { canonicalCorrectionType, correctionTypeLabel } from '../../shared/correctionTypes'
 import { useWindowControls } from '../composables/useWindowControls'
 
 // ---- 自定义窗口控制按钮（action-bar 右上角，与工具栏融为一体）----
@@ -486,50 +487,34 @@ const highlightCorrections = () => {
   })
 }
 
-const formatCorrectionType = type => {
-  const typeMap = {
-    Typo: t('proof.correctionTypes.Typo'),
-    Punctuation: t('proof.correctionTypes.Punctuation'),
-    Grammar: t('proof.correctionTypes.Grammar'),
-    Consistency: t('proof.correctionTypes.Consistency'),
-    wordError: t('proof.correctionTypes.wordError'),
-    ComprehensiveError: t('proof.correctionTypes.ComprehensiveError'),
-    polish: t('proof.correctionTypes.polish'),
-    reduceAI: t('proof.correctionTypes.reduceAI')
-  }
-  return typeMap[type] || type
-}
+const formatCorrectionType = type => correctionTypeLabel(type, t)
 
+// 类型分组统一走规范英文 key（canonicalCorrectionType 归一）：
+// 中文变体（如「错别字」）与英文 key（Typo）并入同一组
 const availableCategories = computed(() => {
-  const typeMap = {
-    Typo: t('proof.correctionTypes.Typo'),
-    Punctuation: t('proof.correctionTypes.Punctuation'),
-    Grammar: t('proof.correctionTypes.Grammar'),
-    Consistency: t('proof.correctionTypes.Consistency'),
-    wordError: t('proof.correctionTypes.wordError'),
-    ComprehensiveError: t('proof.correctionTypes.ComprehensiveError'),
-    polish: t('proof.correctionTypes.polish'),
-    reduceAI: t('proof.correctionTypes.reduceAI')
-  }
   const types = new Set()
   proofreadingResults.value.forEach(item => {
     if (!item.applied && !item.rejected && item.type) {
-      types.add(item.type)
+      types.add(canonicalCorrectionType(item.type))
     }
   })
   return Array.from(types).map(type => ({
     value: type,
-    label: typeMap[type] || type
+    label: correctionTypeLabel(type, t)
   }))
 })
 
 const getCategoryCount = type => {
-  const count = proofreadingResults.value.filter(item => !item.applied && !item.rejected && item.type === type).length
+  const count = proofreadingResults.value.filter(
+    item => !item.applied && !item.rejected && canonicalCorrectionType(item.type) === type
+  ).length
   return t('proof.messages.countItems', { count })
 }
 
 const applyByCategory = type => {
-  const applicableResults = proofreadingResults.value.filter(item => !item.applied && !item.rejected && item.type === type)
+  const applicableResults = proofreadingResults.value.filter(
+    item => !item.applied && !item.rejected && canonicalCorrectionType(item.type) === type
+  )
   if (applicableResults.length === 0) {
     ElMessage.warning(t('proof.messages.noPendingInCategory'))
     return
@@ -538,10 +523,10 @@ const applyByCategory = type => {
   // "结果顺序=文档顺序"分配重复文本的出现位置
   const targetList = proofreadingResults.value
     .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !item.applied && !item.rejected && item.type === type)
+    .filter(({ item }) => !item.applied && !item.rejected && canonicalCorrectionType(item.type) === type)
   const pendingList = proofreadingResults.value
     .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !item.applied && !item.rejected && item.type !== type)
+    .filter(({ item }) => !item.applied && !item.rejected && canonicalCorrectionType(item.type) !== type)
   // 单趟完成「替换目标类型 + 重高亮其余未处理」；预览 DOM 与高亮由本次调用
   // 一次就位，置双豁免标记跳过两侧侦听的整篇重渲染/整列表重高亮
   const container = previewContainer.value
@@ -551,7 +536,7 @@ const applyByCategory = type => {
   fileStore.requestSkipResultRerender()
   fileStore.requestSkipResultRehighlight()
   const newResults = proofreadingResults.value.map(item => {
-    if (!item.applied && item.type === type) {
+    if (!item.applied && canonicalCorrectionType(item.type) === type) {
       return { ...item, applied: true }
     }
     return item
@@ -607,35 +592,29 @@ const rerenderAndReapply = async () => {
 }
 
 const appliedCategories = computed(() => {
-  const typeMap = {
-    Typo: t('proof.correctionTypes.Typo'),
-    Punctuation: t('proof.correctionTypes.Punctuation'),
-    Grammar: t('proof.correctionTypes.Grammar'),
-    Consistency: t('proof.correctionTypes.Consistency'),
-    wordError: t('proof.correctionTypes.wordError'),
-    ComprehensiveError: t('proof.correctionTypes.ComprehensiveError'),
-    polish: t('proof.correctionTypes.polish'),
-    reduceAI: t('proof.correctionTypes.reduceAI')
-  }
   const types = new Set()
   proofreadingResults.value.forEach(item => {
     if (item.applied && item.type) {
-      types.add(item.type)
+      types.add(canonicalCorrectionType(item.type))
     }
   })
   return Array.from(types).map(type => ({
     value: type,
-    label: typeMap[type] || type
+    label: correctionTypeLabel(type, t)
   }))
 })
 
 const getAppliedCategoryCount = type => {
-  const count = proofreadingResults.value.filter(item => item.applied && item.type === type).length
+  const count = proofreadingResults.value.filter(
+    item => item.applied && canonicalCorrectionType(item.type) === type
+  ).length
   return t('proof.messages.countItems', { count })
 }
 
 const undoByCategory = async type => {
-  const appliedResults = proofreadingResults.value.filter(item => item.applied && item.type === type)
+  const appliedResults = proofreadingResults.value.filter(
+    item => item.applied && canonicalCorrectionType(item.type) === type
+  )
   if (appliedResults.length === 0) {
     ElMessage.warning(t('proof.messages.noAppliedChanges'))
     return
@@ -649,7 +628,7 @@ const undoByCategory = async type => {
   fileStore.requestSkipResultRerender()
   fileStore.requestSkipResultRehighlight()
   const newResults = proofreadingResults.value.map(item => {
-    if (item.applied && item.type === type) {
+    if (item.applied && canonicalCorrectionType(item.type) === type) {
       return { ...item, applied: false }
     }
     return item

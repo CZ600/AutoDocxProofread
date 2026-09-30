@@ -32,21 +32,6 @@ const modeLabel = computed(() =>
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 .prompt-content-wrapper {
   padding: 4px 0;
 }
@@ -104,12 +89,6 @@ const modeLabel = computed(() =>
   background: #a8bfcf;
 }
 
-.setting-section {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: #ffffff;
-}
 </style>
 
 <style>

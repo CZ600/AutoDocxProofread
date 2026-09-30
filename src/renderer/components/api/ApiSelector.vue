@@ -130,21 +130,6 @@ const handleTest = async () => {
 </script>
 
 <style scoped>
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
-  margin-bottom: 14px;
-}
-
-.section-header .el-icon {
-  color: var(--brand);
-  font-size: 16px;
-}
-
 /* 悬停提示图标：与 TokenStatistics 的提示符号同一配色 */
 .tooltip-icon {
   cursor: help;
@@ -236,12 +221,6 @@ const handleTest = async () => {
   background-color: #f4f6f9;
 }
 
-.setting-section {
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: #ffffff;
-}
 </style>
 
 <style>

@@ -43,6 +43,31 @@ html.dark ::-webkit-scrollbar-track {
   background-color: transparent;
 }
 
+/* ---- 设置区公共版式（批次 9 自九个组件的 scoped 逐字拷贝收敛）----
+   亮色基类唯一定义于此，暗色适配见上方 html.dark 块；组件内仅保留与基类的
+   差异项（如 RateLimitSettings 的 margin-bottom: 0、APISet 的 margin-top）。 */
+.setting-section {
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #4a6580;
+  margin-bottom: 14px;
+}
+
+.section-header .el-icon {
+  color: var(--brand);
+  font-size: 16px;
+}
+
 /* ---- 设置区公共暗色适配 ----
    原 ConcurrencySettings / ThinkingSettings / ProxySettings / RateLimitSettings /
    TokenStatistics / ApiSelector / PromptDisplay / PromptEditor / APISet / Dictionary
@@ -86,4 +111,178 @@ html.dark .btn-subtle:hover {
 .settings-hint-popper {
   max-width: 320px;
   line-height: 1.6;
+}
+
+/* ---- 校对类型色板（批次 9 自 Proof.vue / history.vue 两处收敛）----
+   类后缀一律为规范英文 key（src/shared/correctionTypes.ts 负责把中文/变体类型名归一），
+   Proof 列表徽标、history 明细徽标与统计 chip、批量应用下拉共用。 */
+.type-typo,
+.type-worderror {
+  --type-badge-bg: rgba(194, 138, 138, 0.14);
+  --type-badge-text: #a87070;
+  --type-category-bg: #c28a8a;
+}
+
+.type-punctuation {
+  --type-badge-bg: rgba(194, 168, 106, 0.14);
+  --type-badge-text: #a08850;
+  --type-category-bg: #c2a86a;
+}
+
+.type-grammar {
+  --type-badge-bg: rgba(123, 158, 184, 0.14);
+  --type-badge-text: #5b7c99;
+  --type-category-bg: var(--brand);
+}
+
+.type-consistency {
+  --type-badge-bg: rgba(138, 146, 158, 0.14);
+  --type-badge-text: #6a7380;
+  --type-category-bg: #8a929e;
+}
+
+.type-comprehensiveerror,
+.type-polish {
+  --type-badge-bg: rgba(138, 184, 158, 0.14);
+  --type-badge-text: #5a9070;
+  --type-category-bg: #8ab89e;
+}
+
+.type-reduceai {
+  --type-badge-bg: rgba(160, 120, 200, 0.14);
+  --type-badge-text: #8a5ebf;
+  --type-category-bg: #9b6dc6;
+}
+
+.type-typo,
+.type-worderror,
+.type-punctuation,
+.type-grammar,
+.type-consistency,
+.type-comprehensiveerror,
+.type-polish,
+.type-reduceai {
+  background-color: var(--type-badge-bg);
+  color: var(--type-badge-text);
+  border: none;
+}
+
+/* 批量应用下拉的类型徽标（DocPreview 模板，原 Proof.vue scoped 维护） */
+.category-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.category-typo,
+.category-worderror,
+.category-punctuation,
+.category-grammar,
+.category-consistency,
+.category-comprehensiveerror,
+.category-polish,
+.category-reduceai {
+  background-color: var(--type-category-bg);
+}
+
+/* ---- 预览高亮（原 Proof.vue 全局块收敛至此：DocPreview 与 Proof 共用，
+   不再依赖「校对页已挂载」才有样式）---- */
+.highlight-correction {
+  --highlight-bg: rgba(255, 214, 102, 0.5);
+  --highlight-bg-hover: rgba(255, 214, 102, 0.7);
+  --highlight-bg-focus: rgba(255, 214, 102, 0.92);
+  --highlight-border: #ffb300;
+  --highlight-ring: rgba(255, 179, 0, 0.28);
+  background-color: var(--highlight-bg) !important;
+  border-bottom: 2px solid var(--highlight-border) !important;
+  cursor: pointer !important;
+  padding: 1px 3px !important;
+  border-radius: 3px !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--highlight-border) 28%, transparent) !important;
+}
+
+.highlight-correction:hover {
+  box-shadow: 0 0 0 3px var(--highlight-ring) !important;
+  background-color: var(--highlight-bg-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.highlight-correction-focused {
+  background-color: var(--highlight-bg-focus) !important;
+  animation: correction-highlight-pulse 0.8s ease-in-out 3 !important;
+}
+
+.highlight-type-typo,
+.highlight-type-worderror {
+  --highlight-bg: rgba(245, 108, 108, 0.24);
+  --highlight-bg-hover: rgba(245, 108, 108, 0.34);
+  --highlight-bg-focus: rgba(245, 108, 108, 0.48);
+  --highlight-border: #e36262;
+  --highlight-ring: rgba(245, 108, 108, 0.32);
+}
+
+.highlight-type-punctuation {
+  --highlight-bg: rgba(230, 162, 60, 0.24);
+  --highlight-bg-hover: rgba(230, 162, 60, 0.34);
+  --highlight-bg-focus: rgba(230, 162, 60, 0.48);
+  --highlight-border: #d89020;
+  --highlight-ring: rgba(230, 162, 60, 0.3);
+}
+
+.highlight-type-grammar {
+  --highlight-bg: rgba(64, 158, 255, 0.24);
+  --highlight-bg-hover: rgba(64, 158, 255, 0.34);
+  --highlight-bg-focus: rgba(64, 158, 255, 0.48);
+  --highlight-border: #3a8ee6;
+  --highlight-ring: rgba(64, 158, 255, 0.32);
+}
+
+.highlight-type-consistency {
+  --highlight-bg: rgba(144, 147, 152, 0.24);
+  --highlight-bg-hover: rgba(144, 147, 152, 0.34);
+  --highlight-bg-focus: rgba(144, 147, 152, 0.48);
+  --highlight-border: #828282;
+  --highlight-ring: rgba(144, 147, 152, 0.3);
+}
+
+.highlight-type-comprehensiveerror,
+.highlight-type-polish {
+  --highlight-bg: rgba(103, 194, 58, 0.24);
+  --highlight-bg-hover: rgba(103, 194, 58, 0.34);
+  --highlight-bg-focus: rgba(103, 194, 58, 0.48);
+  --highlight-border: #5baa3a;
+  --highlight-ring: rgba(103, 194, 58, 0.3);
+}
+
+.highlight-type-reduceai {
+  --highlight-bg: rgba(160, 120, 200, 0.24);
+  --highlight-bg-hover: rgba(160, 120, 200, 0.34);
+  --highlight-bg-focus: rgba(160, 120, 200, 0.48);
+  --highlight-border: #9b6dc6;
+  --highlight-ring: rgba(160, 120, 200, 0.3);
+}
+
+@keyframes correction-highlight-pulse {
+  0% {
+    box-shadow:
+      0 0 0 0 var(--highlight-ring),
+      0 1px 3px color-mix(in srgb, var(--highlight-border) 28%, transparent);
+    transform: translateY(0);
+  }
+  50% {
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--highlight-border) 16%, transparent),
+      0 0 18px color-mix(in srgb, var(--highlight-border) 34%, transparent);
+    transform: translateY(-1px);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 var(--highlight-ring),
+      0 1px 3px color-mix(in srgb, var(--highlight-border) 28%, transparent);
+    transform: translateY(0);
+  }
 }
