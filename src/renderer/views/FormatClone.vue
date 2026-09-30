@@ -95,131 +95,11 @@
               <div class="format-detail">
                 <div v-if="item.paragraphStyle && Object.keys(item.paragraphStyle).length > 0" class="style-section">
                   <strong>{{ t('proof.formatClone.paragraphStyle') }}</strong>
-                  <div class="style-props">
-                    <div v-for="(val, key) in item.paragraphStyle" :key="key" class="style-prop">
-                      <span class="prop-key">{{ key }}</span>
-                      <span class="prop-val">
-                        <template v-if="isBoolField(val)">
-                          <button class="toggle-btn" :class="{ on: val }" @click="toggleStyleProp(item, 'paragraphStyle', key)">
-                            {{ val }}
-                          </button>
-                        </template>
-                        <template v-else-if="isStepperField(key)">
-                          <span class="stepper">
-                            <button class="step-btn" @click="stepValue(item, 'paragraphStyle', key, -1)">−</button>
-                            <span class="stepper-val">{{ val }}</span>
-                            <button class="step-btn" @click="stepValue(item, 'paragraphStyle', key, 1)">+</button>
-                          </span>
-                        </template>
-                        <template v-else-if="isColorField(key)">
-                          <el-popover placement="bottom" :width="200" trigger="click">
-                            <template #reference>
-                              <span class="color-chip">
-                                <span class="color-swatch" :style="{ background: toHex(val) }"></span>
-                                {{ val }}
-                              </span>
-                            </template>
-                            <input type="color" :value="toHex(val)" @change="setColor(item, 'paragraphStyle', key, $event)" />
-                          </el-popover>
-                        </template>
-                        <template v-else-if="isSpacingField(key)">
-                          <span class="spacing-row">
-                            <template v-if="val.before !== undefined">
-                              <span class="spacing-label">before</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'paragraphStyle', 'before', -1)">−</button>
-                              <span class="stepper-val">{{ val.before }}</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'paragraphStyle', 'before', 1)">+</button>
-                            </template>
-                            <template v-if="val.after !== undefined">
-                              <span class="spacing-label">after</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'paragraphStyle', 'after', -1)">−</button>
-                              <span class="stepper-val">{{ val.after }}</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'paragraphStyle', 'after', 1)">+</button>
-                            </template>
-                            <template v-if="val.line !== undefined">
-                              <span class="spacing-label">line</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'paragraphStyle', 'line', -1)">−</button>
-                              <span class="stepper-val">{{ val.line }}</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'paragraphStyle', 'line', 1)">+</button>
-                            </template>
-                            <template v-for="(sv, sk) in val" :key="sk">
-                              <template v-if="sk !== 'before' && sk !== 'after' && sk !== 'line'">
-                                <span class="spacing-label">{{ sk }}</span>
-                                <span class="spacing-other">{{ sv }}</span>
-                              </template>
-                            </template>
-                          </span>
-                        </template>
-                        <template v-else>
-                          {{ formatPropVal(val) }}
-                        </template>
-                      </span>
-                    </div>
-                  </div>
+                  <StylePropsEditor :style-obj="item.paragraphStyle" />
                 </div>
                 <div v-if="item.runStyle && Object.keys(item.runStyle).length > 0" class="style-section">
                   <strong>{{ t('proof.formatClone.runStyle') }}</strong>
-                  <div class="style-props">
-                    <div v-for="(val, key) in item.runStyle" :key="key" class="style-prop">
-                      <span class="prop-key">{{ key }}</span>
-                      <span class="prop-val">
-                        <template v-if="isBoolField(val)">
-                          <button class="toggle-btn" :class="{ on: val }" @click="toggleStyleProp(item, 'runStyle', key)">
-                            {{ val }}
-                          </button>
-                        </template>
-                        <template v-else-if="isStepperField(key)">
-                          <span class="stepper">
-                            <button class="step-btn" @click="stepValue(item, 'runStyle', key, -1)">−</button>
-                            <span class="stepper-val">{{ val }}</span>
-                            <button class="step-btn" @click="stepValue(item, 'runStyle', key, 1)">+</button>
-                          </span>
-                        </template>
-                        <template v-else-if="isColorField(key)">
-                          <el-popover placement="bottom" :width="200" trigger="click">
-                            <template #reference>
-                              <span class="color-chip">
-                                <span class="color-swatch" :style="{ background: toHex(val) }"></span>
-                                {{ val }}
-                              </span>
-                            </template>
-                            <input type="color" :value="toHex(val)" @change="setColor(item, 'runStyle', key, $event)" />
-                          </el-popover>
-                        </template>
-                        <template v-else-if="isSpacingField(key)">
-                          <span class="spacing-row">
-                            <template v-if="val.before !== undefined">
-                              <span class="spacing-label">before</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'runStyle', 'before', -1)">−</button>
-                              <span class="stepper-val">{{ val.before }}</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'runStyle', 'before', 1)">+</button>
-                            </template>
-                            <template v-if="val.after !== undefined">
-                              <span class="spacing-label">after</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'runStyle', 'after', -1)">−</button>
-                              <span class="stepper-val">{{ val.after }}</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'runStyle', 'after', 1)">+</button>
-                            </template>
-                            <template v-if="val.line !== undefined">
-                              <span class="spacing-label">line</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'runStyle', 'line', -1)">−</button>
-                              <span class="stepper-val">{{ val.line }}</span>
-                              <button class="step-btn" @click="stepSpacing(item, 'runStyle', 'line', 1)">+</button>
-                            </template>
-                            <template v-for="(sv, sk) in val" :key="sk">
-                              <template v-if="sk !== 'before' && sk !== 'after' && sk !== 'line'">
-                                <span class="spacing-label">{{ sk }}</span>
-                                <span class="spacing-other">{{ sv }}</span>
-                              </template>
-                            </template>
-                          </span>
-                        </template>
-                        <template v-else>
-                          {{ formatPropVal(val) }}
-                        </template>
-                      </span>
-                    </div>
-                  </div>
+                  <StylePropsEditor :style-obj="item.runStyle" />
                 </div>
               </div>
             </el-collapse-item>
@@ -238,131 +118,11 @@
               <div class="format-detail">
                 <div v-if="defaults.paragraphStyle && Object.keys(defaults.paragraphStyle).length > 0" class="style-section">
                   <strong>{{ t('proof.formatClone.paragraphStyle') }}</strong>
-                  <div class="style-props">
-                    <div v-for="(val, key) in defaults.paragraphStyle" :key="key" class="style-prop">
-                      <span class="prop-key">{{ key }}</span>
-                      <span class="prop-val">
-                        <template v-if="isBoolField(val)">
-                          <button class="toggle-btn" :class="{ on: val }" @click="toggleDefaultsProp('paragraphStyle', key)">
-                            {{ val }}
-                          </button>
-                        </template>
-                        <template v-else-if="isStepperField(key)">
-                          <span class="stepper">
-                            <button class="step-btn" @click="stepDefaultsValue('paragraphStyle', -1)">−</button>
-                            <span class="stepper-val">{{ val }}</span>
-                            <button class="step-btn" @click="stepDefaultsValue('paragraphStyle', 1)">+</button>
-                          </span>
-                        </template>
-                        <template v-else-if="isColorField(key)">
-                          <el-popover placement="bottom" :width="200" trigger="click">
-                            <template #reference>
-                              <span class="color-chip">
-                                <span class="color-swatch" :style="{ background: toHex(val) }"></span>
-                                {{ val }}
-                              </span>
-                            </template>
-                            <input type="color" :value="toHex(val)" @change="setDefaultsColor('paragraphStyle', key, $event)" />
-                          </el-popover>
-                        </template>
-                        <template v-else-if="isSpacingField(key)">
-                          <span class="spacing-row">
-                            <template v-if="val.before !== undefined">
-                              <span class="spacing-label">before</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('paragraphStyle', 'before', -1)">−</button>
-                              <span class="stepper-val">{{ val.before }}</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('paragraphStyle', 'before', 1)">+</button>
-                            </template>
-                            <template v-if="val.after !== undefined">
-                              <span class="spacing-label">after</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('paragraphStyle', 'after', -1)">−</button>
-                              <span class="stepper-val">{{ val.after }}</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('paragraphStyle', 'after', 1)">+</button>
-                            </template>
-                            <template v-if="val.line !== undefined">
-                              <span class="spacing-label">line</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('paragraphStyle', 'line', -1)">−</button>
-                              <span class="stepper-val">{{ val.line }}</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('paragraphStyle', 'line', 1)">+</button>
-                            </template>
-                            <template v-for="(sv, sk) in val" :key="sk">
-                              <template v-if="sk !== 'before' && sk !== 'after' && sk !== 'line'">
-                                <span class="spacing-label">{{ sk }}</span>
-                                <span class="spacing-other">{{ sv }}</span>
-                              </template>
-                            </template>
-                          </span>
-                        </template>
-                        <template v-else>
-                          {{ formatPropVal(val) }}
-                        </template>
-                      </span>
-                    </div>
-                  </div>
+                  <StylePropsEditor :style-obj="defaults.paragraphStyle" />
                 </div>
                 <div v-if="defaults.runStyle && Object.keys(defaults.runStyle).length > 0" class="style-section">
                   <strong>{{ t('proof.formatClone.runStyle') }}</strong>
-                  <div class="style-props">
-                    <div v-for="(val, key) in defaults.runStyle" :key="key" class="style-prop">
-                      <span class="prop-key">{{ key }}</span>
-                      <span class="prop-val">
-                        <template v-if="isBoolField(val)">
-                          <button class="toggle-btn" :class="{ on: val }" @click="toggleDefaultsProp('runStyle', key)">
-                            {{ val }}
-                          </button>
-                        </template>
-                        <template v-else-if="isStepperField(key)">
-                          <span class="stepper">
-                            <button class="step-btn" @click="stepDefaultsValue('runStyle', -1)">−</button>
-                            <span class="stepper-val">{{ val }}</span>
-                            <button class="step-btn" @click="stepDefaultsValue('runStyle', 1)">+</button>
-                          </span>
-                        </template>
-                        <template v-else-if="isColorField(key)">
-                          <el-popover placement="bottom" :width="200" trigger="click">
-                            <template #reference>
-                              <span class="color-chip">
-                                <span class="color-swatch" :style="{ background: toHex(val) }"></span>
-                                {{ val }}
-                              </span>
-                            </template>
-                            <input type="color" :value="toHex(val)" @change="setDefaultsColor('runStyle', key, $event)" />
-                          </el-popover>
-                        </template>
-                        <template v-else-if="isSpacingField(key)">
-                          <span class="spacing-row">
-                            <template v-if="val.before !== undefined">
-                              <span class="spacing-label">before</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('runStyle', 'before', -1)">−</button>
-                              <span class="stepper-val">{{ val.before }}</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('runStyle', 'before', 1)">+</button>
-                            </template>
-                            <template v-if="val.after !== undefined">
-                              <span class="spacing-label">after</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('runStyle', 'after', -1)">−</button>
-                              <span class="stepper-val">{{ val.after }}</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('runStyle', 'after', 1)">+</button>
-                            </template>
-                            <template v-if="val.line !== undefined">
-                              <span class="spacing-label">line</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('runStyle', 'line', -1)">−</button>
-                              <span class="stepper-val">{{ val.line }}</span>
-                              <button class="step-btn" @click="stepDefaultsSpacing('runStyle', 'line', 1)">+</button>
-                            </template>
-                            <template v-for="(sv, sk) in val" :key="sk">
-                              <template v-if="sk !== 'before' && sk !== 'after' && sk !== 'line'">
-                                <span class="spacing-label">{{ sk }}</span>
-                                <span class="spacing-other">{{ sv }}</span>
-                              </template>
-                            </template>
-                          </span>
-                        </template>
-                        <template v-else>
-                          {{ formatPropVal(val) }}
-                        </template>
-                      </span>
-                    </div>
-                  </div>
+                  <StylePropsEditor :style-obj="defaults.runStyle" />
                 </div>
               </div>
             </el-collapse-item>
@@ -429,13 +189,19 @@
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
-import { ElButton, ElCheckbox, ElCollapse, ElCollapseItem, ElMessage, ElTooltip, ElIcon, ElPopover, ElRadio, ElRadioGroup } from 'element-plus'
+import { ElButton, ElCheckbox, ElCollapse, ElCollapseItem, ElMessage, ElTooltip, ElIcon, ElRadio, ElRadioGroup } from 'element-plus'
 import { QuestionFilled, CircleClose } from '@element-plus/icons-vue'
 
 import { useApiStore } from '../stores/apiStore'
 import { fileInfoStore } from '../stores/store'
-import { renderAsync } from 'docx-preview'
-import { applyPreviewPerfHints } from '../utils/previewPerf'
+import { renderDocxFileToContainer } from '../utils/previewRender'
+import StylePropsEditor from '../components/format/StylePropsEditor.vue'
+import {
+  buildProfileFromItems,
+  buildSpecFromItems,
+  specToDefaults,
+  specToFormatItems
+} from '../utils/formatCloneSpec'
 
 const electronAPI = window.electronAPI
 const apiStore = useApiStore()
@@ -482,190 +248,18 @@ const agentTokenUsage = ref(0)
 const progressPercent = ref(0)
 let progressInterval = null
 
-// ---- Utility helpers (preserved exactly from original) ----
+// ---- Utility helpers ----
 
 const truncatedName = name => (name.length > 20 ? name.slice(0, 20) + '...' : name)
 
-const isBoolField = val => typeof val === 'boolean'
-const isStepperField = key => key === 'fontSize' || key === 'outlineLevel'
-const isColorField = key => key === 'color' || key === 'highlight'
-const isSpacingField = key => key === 'spacing'
-
-const toHex = v => {
-  if (!v || typeof v !== 'string') return '#000000'
-  return v.startsWith('#') ? v : '#' + v
-}
-
-const fromHex = v => (v || '').replace('#', '').toUpperCase()
-
-const formatPropVal = val => {
-  if (typeof val === 'object' && val !== null) {
-    return Object.entries(val).map(([k, v]) => `${k}: ${v}`).join(', ')
-  }
-  return String(val)
-}
-
-const toggleStyleProp = (item, styleType, key) => {
-  item[styleType][key] = !item[styleType][key]
-}
-
-const stepValue = (item, styleType, fieldKey, delta) => {
-  const cur = parseInt(item[styleType][fieldKey]) || 0
-  const max = fieldKey === 'outlineLevel' ? 9 : 200
-  const min = fieldKey === 'outlineLevel' ? 0 : 6
-  const step = fieldKey === 'outlineLevel' ? 1 : 2
-  const next = Math.max(min, Math.min(max, cur + delta * step))
-  item[styleType][fieldKey] = String(next)
-}
-
-const stepSpacing = (item, styleType, fieldKey, delta) => {
-  const cur = parseInt(item[styleType].spacing[fieldKey]) || 0
-  const next = Math.max(0, cur + delta * 20)
-  item[styleType].spacing[fieldKey] = String(next)
-}
-
-const setColor = (item, styleType, key, event) => {
-  item[styleType][key] = fromHex(event.target.value)
-}
-
-const toggleDefaultsProp = (styleType, key) => {
-  if (!defaults.value[styleType]) return
-  defaults.value[styleType][key] = !defaults.value[styleType][key]
-}
-
-const stepDefaultsValue = (styleType, fieldKey, delta) => {
-  if (!defaults.value[styleType]) return
-  const cur = parseInt(defaults.value[styleType][fieldKey]) || 0
-  const max = fieldKey === 'outlineLevel' ? 9 : 200
-  const min = fieldKey === 'outlineLevel' ? 0 : 6
-  const step = fieldKey === 'outlineLevel' ? 1 : 2
-  const next = Math.max(min, Math.min(max, cur + delta * step))
-  defaults.value[styleType][fieldKey] = String(next)
-}
-
-const stepDefaultsSpacing = (styleType, fieldKey, delta) => {
-  if (!defaults.value[styleType] || !defaults.value[styleType].spacing) return
-  const cur = parseInt(defaults.value[styleType].spacing[fieldKey]) || 0
-  const next = Math.max(0, cur + delta * 20)
-  defaults.value[styleType].spacing[fieldKey] = String(next)
-}
-
-const setDefaultsColor = (styleType, key, event) => {
-  if (!defaults.value[styleType]) return
-  defaults.value[styleType][key] = fromHex(event.target.value)
-}
-
-// ---- Profile building ----
-
-const buildProfile = () => {
-  const styles = {}
-  for (const item of formatItems.value) {
-    styles[item.id] = {
-      name: item.name,
-      type: item.type,
-      paragraphStyle: item.paragraphStyle,
-      runStyle: item.runStyle
-    }
-  }
-  return { defaults: defaults.value, styles }
-}
-
-// ---- Spec conversion for agent flow ----
-
-const specToFormatItems = (spec) => {
-  const items = []
-  // styleProfile.styles → items
-  if (spec.styleProfile?.styles) {
-    for (const [id, style] of Object.entries(spec.styleProfile.styles)) {
-      items.push({
-        id,
-        name: style.name || id,
-        type: style.type || 'paragraph',
-        basedOn: style.basedOn || undefined,
-        paragraphStyle: { ...(style.paragraphStyle || {}) },
-        runStyle: { ...(style.runStyle || {}) }
-      })
-    }
-  }
-  // paragraphRules → add items for types not yet in list
-  if (spec.paragraphRules) {
-    for (const rule of spec.paragraphRules) {
-      const pType = rule.match?.paragraphType
-      if (pType && !items.find(i => i.id === pType)) {
-        items.push({
-          id: pType,
-          name: pType,
-          type: 'paragraph',
-          basedOn: undefined,
-          paragraphStyle: { ...(rule.format?.paragraphStyle || {}) },
-          runStyle: { ...(rule.format?.runStyle || {}) }
-        })
-      }
-    }
-  }
-  return items
-}
-
-const specToDefaults = (spec) => {
-  return spec.styleProfile?.defaults || null
-}
-
-const buildSpecFromFormatItems = () => {
-  const styles = {}
-  // Rebuild paragraphRules from user-edited formatItems so edits actually take effect
-  const paragraphRules = []
-  for (const item of formatItems.value) {
-    const styleEntry = {
-      name: item.name,
-      type: item.type,
-      basedOn: item.basedOn || undefined,
-      paragraphStyle: item.paragraphStyle,
-      runStyle: item.runStyle
-    }
-    styles[item.id] = styleEntry
-
-    // Create a matching paragraphRule so inline formatting is applied to paragraphs
-    paragraphRules.push({
-      match: { paragraphType: item.id },
-      format: {
-        paragraphStyle: item.paragraphStyle,
-        runStyle: item.runStyle
-      },
-      exclusive: true
-    })
-  }
-
-  // Preserve pageSettings from original spec
-  const pageSettings = agentSpec.value?.pageSettings || undefined
-
-  return {
-    styleProfile: {
-      defaults: defaults.value ? { ...defaults.value } : undefined,
-      styles
-    },
-    paragraphRules,
-    ...(pageSettings ? { pageSettings } : {})
-  }
-}
+// 属性编辑控件（布尔开关/步进/取色/间距）收敛在 StylePropsEditor.vue，
+// spec/profile 的纯函数转换收敛在 utils/formatCloneSpec.js
 
 // ---- Preview rendering ----
 
 const renderPreview = async (filePath) => {
-  const fileData = await electronAPI.readDocxFile(filePath)
-  // IPC 结构化克隆直传字节数组：免去 base64 编码（+33% 体积）与逐字节解码
-  const blob = new Blob([fileData.buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  })
-  const file = new File([blob], fileStore.fileName, {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  })
-  const container = document.querySelector('.preview-container')
-  if (container) {
-    container.innerHTML = ''
-    await renderAsync(file, container)
-    // 与校对预览一致的大文档优化：视口外页面跳过渲染
-    applyPreviewPerfHints(container)
-  }
+  // 读取/构建 File/渲染收敛在 utils/previewRender.js
+  await renderDocxFileToContainer(filePath, fileStore.fileName, document.querySelector('.preview-container'))
 }
 
 // ---- Reference doc selection ----
@@ -713,13 +307,7 @@ const selectDescFile = async () => {
     if (!filePath) return
 
     // Clear previous results so input area shows again
-    formatItems.value = []
-    defaults.value = null
-    clonedFilePath.value = ''
-    flowType.value = 'simple'
-    agentSpec.value = null
-    agentClassification.value = null
-    agentTokenUsage.value = 0
+    resetResults()
 
     descFileName.value = filePath.split('\\').pop().split('/').pop()
 
@@ -749,18 +337,23 @@ const selectDescFile = async () => {
 
 // ---- Clear functions ----
 
+/** 清空识别结果，回到「待分析」输入态（参考文档/描述文件清理共用） */
+const resetResults = () => {
+  formatItems.value = []
+  defaults.value = null
+  clonedFilePath.value = ''
+  flowType.value = 'simple'
+  agentSpec.value = null
+  agentClassification.value = null
+  agentTokenUsage.value = 0
+}
+
 const clearRefFile = () => {
   refFilePath.value = ''
   refFileName.value = ''
   // 如果没有格式描述，清除结果状态
   if (!descText.value.trim()) {
-    formatItems.value = []
-    defaults.value = null
-    clonedFilePath.value = ''
-    flowType.value = 'simple'
-    agentSpec.value = null
-    agentClassification.value = null
-    agentTokenUsage.value = 0
+    resetResults()
   }
   ElMessage.success(t('proof.formatClone.clearedRef'))
 }
@@ -770,13 +363,7 @@ const clearDescFile = () => {
   descText.value = ''
   // 如果没有参考文档，清除结果状态
   if (!refFilePath.value) {
-    formatItems.value = []
-    defaults.value = null
-    clonedFilePath.value = ''
-    flowType.value = 'simple'
-    agentSpec.value = null
-    agentClassification.value = null
-    agentTokenUsage.value = 0
+    resetResults()
   }
   ElMessage.success(t('proof.formatClone.clearedDesc'))
 }
@@ -883,7 +470,7 @@ const doClone = async () => {
     if (flowType.value === 'agent' && agentSpec.value && agentClassification.value) {
       // Agent flow: rebuild spec from edited formatItems and apply
       // Deep-clone to strip Vue reactive Proxies — IPC structured clone cannot serialize Proxies
-      const spec = JSON.parse(JSON.stringify(buildSpecFromFormatItems()))
+      const spec = JSON.parse(JSON.stringify(buildSpecFromItems(formatItems.value, defaults.value, agentSpec.value)))
       const outputPath = outputMode.value === 'new'
         ? targetFilePath.value.replace(/\.docx$/i, '_formatted.docx')
         : targetFilePath.value
@@ -911,7 +498,7 @@ const doClone = async () => {
       }
     } else {
       // Simple clone flow
-      const profile = JSON.parse(JSON.stringify(buildProfile()))
+      const profile = JSON.parse(JSON.stringify(buildProfileFromItems(formatItems.value, defaults.value)))
       let result
       if (forceOverwrite.value) {
         // 强制覆盖行内格式
@@ -968,18 +555,6 @@ const doExport = async () => {
     exporting.value = false
   }
 }
-
-// ---- Expose state for App.vue to provide to DocPreview ----
-defineExpose({
-  refFilePath,
-  targetFilePath,
-  clonedFilePath,
-  cloning,
-  exporting,
-  formatItems,
-  doClone,
-  doExport
-})
 </script>
 
 <style scoped>
@@ -990,21 +565,6 @@ defineExpose({
   overflow: hidden;
   background-color: #ffffff;
   font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-
-.clone-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid #edf0f4;
-  flex-shrink: 0;
-}
-
-.header-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: #4a6580;
 }
 
 .clone-body {
@@ -1044,13 +604,6 @@ defineExpose({
   color: #4a6580;
   white-space: nowrap;
   min-width: 80px;
-}
-
-.ref-file-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
 }
 
 .ref-file-name {
@@ -1196,128 +749,9 @@ defineExpose({
   margin-bottom: 6px;
 }
 
-.style-props {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
+/* 属性行编辑控件样式已随 StylePropsEditor.vue 迁出（批次 9） */
 
-.style-prop {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  line-height: 1.5;
-  min-width: 0;
-  gap: 6px;
-}
-
-.prop-key {
-  color: #8a929e;
-  width: 80px;
-  flex-shrink: 0;
-}
-
-.prop-val {
-  color: #5a6a7a;
-  min-width: 0;
-  overflow: hidden;
-  flex: 1;
-}
-
-.toggle-btn {
-  border: 1px solid #d0d5dd;
-  border-radius: 4px;
-  padding: 1px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  background: #f5f6f8;
-  color: #8a929e;
-  transition: all 0.15s;
-}
-
-.toggle-btn.on {
-  background: rgba(103, 194, 58, 0.12);
-  border-color: #67c23a;
-  color: #5baa3a;
-}
-
-.stepper {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.stepper-val {
-  font-size: 12px;
-  min-width: 20px;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-
-.step-btn {
-  border: 1px solid #d0d5dd;
-  border-radius: 3px;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-  background: #f5f6f8;
-  color: #5a6a7a;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.step-btn:hover {
-  background: #e8ebf0;
-}
-
-.color-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  padding: 1px 6px;
-  border-radius: 4px;
-  border: 1px solid #e0e3e8;
-}
-
-.color-chip:hover {
-  border-color: #b0b8c4;
-}
-
-.color-swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(0,0,0,0.1);
-  flex-shrink: 0;
-}
-
-.spacing-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.spacing-label {
-  font-size: 10px;
-  color: #a0a8b4;
-  margin-right: 2px;
-}
-
-.spacing-other {
-  font-size: 12px;
-  color: #5a6a7a;
-  margin-right: 8px;
-}
-
-/* ---- Results summary ---- */
-.result-summary {
+/* ---- Results summary ---- */.result-summary {
   font-size: 12px;
   color: #8a929e;
   padding: 4px 0 8px;
@@ -1379,24 +813,9 @@ defineExpose({
   margin: 2px 0;
 }
 
-.detail-row {
-  font-size: 12px;
-  line-height: 1.8;
-  color: #5a6a7a;
-  padding: 2px 0;
-}
-
 /* ---- Dark mode overrides ---- */
 html.dark .format-clone-panel {
   background-color: var(--bg-page);
-}
-
-html.dark .clone-header {
-  border-bottom-color: #2c2e30;
-}
-
-html.dark .header-title {
-  color: #c0c8d0;
 }
 
 html.dark .input-label {
@@ -1454,51 +873,7 @@ html.dark .style-section strong {
   color: #a0bdd0;
 }
 
-html.dark .prop-key {
-  color: #8890a0;
-}
-
-html.dark .prop-val {
-  color: #a0a8b4;
-}
-
-html.dark .toggle-btn {
-  border-color: #3a3a4a;
-  background: #2a2a3a;
-  color: #8890a0;
-}
-
-html.dark .toggle-btn.on {
-  background: rgba(103, 194, 58, 0.15);
-  border-color: #67c23a;
-  color: #67c23a;
-}
-
-html.dark .step-btn {
-  border-color: #3a3a4a;
-  background: #2a2a3a;
-  color: #a0a8b4;
-}
-
-html.dark .step-btn:hover {
-  background: #3a3a4a;
-}
-
-html.dark .color-chip {
-  border-color: #3a3a4a;
-}
-
-html.dark .color-chip:hover {
-  border-color: #6a7078;
-}
-
-html.dark .spacing-label {
-  color: #6a7078;
-}
-
-html.dark .spacing-other {
-  color: #a0a8b4;
-}
+/* 属性行编辑控件的暗色样式已随 StylePropsEditor.vue 迁出（批次 9） */
 
 html.dark .result-summary {
   color: #8890a0;
@@ -1506,10 +881,6 @@ html.dark .result-summary {
 
 html.dark .action-bar-bottom {
   border-top-color: #2c2e30;
-}
-
-html.dark .detail-row {
-  color: #a0a8b4;
 }
 
 html.dark .force-overwrite-row :deep(.el-checkbox__label) {

@@ -64,7 +64,7 @@
         <div class="top-toolbar"></div>
         <div class="content-row">
           <main class="function-panel">
-            <FormatClone v-if="activeMode === 'format-clone'" ref="formatCloneRef" />
+            <FormatClone v-if="activeMode === 'format-clone'" />
             <router-view v-else />
           </main>
           <section class="preview-panel">
@@ -82,7 +82,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { HomeFilled, InfoFilled, Setting, Clock, Collection, Sunny, Moon } from '@element-plus/icons-vue'
 import { useDark, useToggle } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
-import { fileInfoStore } from './stores/store'
 import { useLocaleStore } from './stores/localeStore'
 import { useSkinStore } from './stores/skinStore'
 import en from 'element-plus/es/locale/lang/en'
@@ -126,30 +125,6 @@ watch(() => route.path, (newPath) => {
 
 const currentPath = computed(() => route.path)
 const elementLocale = computed(() => (localeStore.locale === 'en' ? en : zhCn))
-
-// ---- 格式克隆：FormatClone 内部管理状态，App.vue 仅做 provide 桥接 ----
-const fileStore = fileInfoStore()
-const formatCloneRef = ref(null)
-
-// 桥接 FormatClone defineExpose 的状态给 DocPreview
-const fcRefFilePath = computed(() => formatCloneRef.value?.refFilePath?.value ?? '')
-const fcTargetFilePath = computed(() => fileStore.filePath)
-const fcClonedFilePath = computed(() => formatCloneRef.value?.clonedFilePath?.value ?? '')
-const fcCloning = computed(() => formatCloneRef.value?.cloning?.value ?? false)
-const fcExporting = computed(() => formatCloneRef.value?.exporting?.value ?? false)
-const fcFormatItems = computed(() => formatCloneRef.value?.formatItems?.value ?? [])
-const fcDoClone = () => formatCloneRef.value?.doClone?.()
-const fcDoExport = () => formatCloneRef.value?.doExport?.()
-
-provide('formatCloneRefFilePath', fcRefFilePath)
-provide('formatCloneTargetFilePath', fcTargetFilePath)
-provide('formatCloneClonedFilePath', fcClonedFilePath)
-provide('formatCloneCloning', fcCloning)
-provide('formatCloneExporting', fcExporting)
-provide('formatCloneFormatItems', fcFormatItems)
-provide('formatCloneDoClone', fcDoClone)
-provide('formatCloneDoExport', fcDoExport)
-// ----------------------------------------------------------------
 
 const getEnv = async () => {
   const envPath = await electronAPI.getEnvPath()

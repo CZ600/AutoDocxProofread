@@ -4,7 +4,7 @@
  * 8 个规范英文 key 与 i18n 的 proof.correctionTypes.* 一一对应；
  * LLM 可能返回的中文/大小写变体类型名经 canonicalCorrectionType 归一，
  * 历史 CSS 里 .highlight-type-错别字 这类中文类名依赖就此消除——
- * type-*/category-*/highlight-type-* 的色板唯一维护在 common.css。
+ * type-/category-/highlight-type- 三族前缀类名的色板唯一维护在 common.css。
  *
  * 注意：结果数据里存储的 type 保持 LLM 原值不改写，仅在展示、分组、
  * CSS 类名三处消费时归一，保证与历史库数据兼容。
@@ -56,7 +56,7 @@ export const canonicalCorrectionType = (type: unknown): string => {
   return CANONICAL_TYPES[raw.toLowerCase()] ?? raw
 }
 
-/** 类型 → CSS 类后缀（小写英文 key）：type-*/category-*/highlight-type-* 统一用 */
+/** 类型 → CSS 类后缀（小写英文 key）：type-/category-/highlight-type- 前缀类名统一用 */
 export const correctionTypeCssKey = (type: unknown): string =>
   canonicalCorrectionType(type).toLowerCase()
 
