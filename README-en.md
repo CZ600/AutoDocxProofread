@@ -34,28 +34,28 @@ Why use this software?
 
 Users need to first select a large model in the settings page before starting proofreading. On the document proofreading page, first select the document to proofread, then choose the proofreading mode, select a knowledge base (optional), and start proofreading. The software will display the proofreading results in the right sidebar and highlight them in the text for easy viewing. You can then choose whether to accept these modifications and export the document with accepted changes:
 
-![Document Proofreading Page](assets/新首页.png)
+![Document Proofreading Page](docs/新首页.png)
 
 The Reduce AI Detection Rate feature adjusts the language style of AI-generated text to lower the probability of being flagged by AI detection tools. During the process, references, titles, etc. are automatically skipped. This feature also uses segmented parallel processing:
-![Reduce AI Rate](assets/降低ai率.png)
+![Reduce AI Rate](docs/降低ai率.png)
 
 The Format Clone feature extracts format styles from a reference document and applies them to the target document, with fine-tuning options available during application:
-![Format Clone](assets/格式克隆.png)
+![Format Clone](docs/格式克隆.png)
 
 This application allows custom API settings, compatible with APIs meeting OpenAI specifications. Non-reasoning models are recommended, and you can limit concurrent request count and request rate:
 
-![Settings Interface](assets/设置页面.png)
+![Settings Interface](docs/设置页面.png)
 
 You can set proofreading error types, strictness level, and text background, or set custom prompts:
 
-![Prompt Settings](assets/提示词设置.png)
+![Prompt Settings](docs/提示词设置.png)
 
 This application also allows browsing and managing proofreading history:
 
-![History Interface](assets/历史记录.png)
+![History Interface](docs/历史记录.png)
 
 Dark Mode:
-![Dark Mode](assets/深色模式.png)
+![Dark Mode](docs/深色模式.png)
 
 ### ⚠️ Important Notes!
 - Note: The accuracy of proofreading results depends largely on the model's capabilities. The software cannot guarantee complete accuracy of proofreading results, and manual verification is still required!
