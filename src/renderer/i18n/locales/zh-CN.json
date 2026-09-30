@@ -167,6 +167,7 @@
     "ignore": "忽略",
     "unignore": "取消忽略",
     "rejectedTag": "已忽略",
+    "appliedTag": "已应用",
     "editedTag": "已编辑",
     "editSuggested": "编辑建议内容",
     "saveEdit": "保存",

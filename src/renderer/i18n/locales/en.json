@@ -167,6 +167,7 @@
     "ignore": "Ignore",
     "unignore": "Unignore",
     "rejectedTag": "Ignored",
+    "appliedTag": "Applied",
     "editedTag": "Edited",
     "editSuggested": "Edit suggested text",
     "saveEdit": "Save",

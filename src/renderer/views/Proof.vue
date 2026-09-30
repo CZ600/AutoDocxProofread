@@ -15,6 +15,9 @@
                 {{ formatCorrectionType(item.type) }}
               </span>
               <span v-if="item.rejected" class="correction-rejected-tag">{{ t('proof.rejectedTag') }}</span>
+              <el-icon v-if="item.applied" class="correction-applied-check" :title="t('proof.appliedTag')">
+                <Check />
+              </el-icon>
               <span class="correction-count">{{ index + 1 }}/{{ proofreadingResults.length }}</span>
             </div>
           </template>
@@ -122,7 +125,7 @@ import { ref, onMounted, onUnmounted, watch, nextTick, computed, inject } from '
 import { useI18n } from 'vue-i18n'
 const { t } = useI18n()
 import { ElButton, ElEmpty, ElCollapse, ElCollapseItem, ElInput, ElMessage, ElPopover, ElTag } from 'element-plus'
-import { EditPen } from '@element-plus/icons-vue'
+import { Check, EditPen } from '@element-plus/icons-vue'
 
 import { scrollTo } from 'vue-scrollto'
 import { fileInfoStore } from '../stores/store'
@@ -580,6 +583,10 @@ html.dark .correction-rejected-tag {
   border-color: var(--border-strong);
 }
 
+html.dark .correction-applied-check {
+  color: #5bd07a;
+}
+
 html.dark .edit-icon {
   color: #6a6a6a;
 }
@@ -768,6 +775,15 @@ html.dark .el-collapse-item__header.is-active {
   line-height: 18px;
 }
 
+/* 已应用的建议：标题旁显示绿色对勾 */
+.correction-applied-check {
+  margin-left: 8px;
+  margin-right: auto;
+  font-size: 16px;
+  color: #34a853;
+  font-weight: 700;
+}
+
 .suggested-text {
   word-break: break-word;
 }
@@ -814,6 +830,9 @@ html.dark .el-collapse-item__header.is-active {
 
 .correction-type {
   display: inline-block;
+  box-sizing: border-box;
+  min-width: 68px;
+  text-align: center;
   padding: 4px 10px;
   border-radius: 5px;
   font-size: 12px;
