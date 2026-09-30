@@ -356,12 +356,13 @@ const handleTest = async () => {
 </style>
 
 <style>
-html.dark .api-dialog :deep(.el-dialog__header) {
-  border-bottom-color: #2c2e30;
+/* 非 scoped 块不能用 :deep()（浏览器整条丢弃规则），子元素直接写类名 */
+html.dark .api-dialog .el-dialog__header {
+  border-bottom-color: var(--border-color);
 }
 
-html.dark .api-dialog :deep(.el-dialog__footer) {
-  border-top-color: #2c2e30;
+html.dark .api-dialog .el-dialog__footer {
+  border-top-color: var(--border-color);
 }
 
 html.dark .dialog-header {

@@ -13,20 +13,20 @@
       <div class="setting-body">
         <el-button
           :type="openTimeLimit ? 'primary' : 'default'"
-          @click="handleToggleLimit"
           class="toggle-btn"
           :class="{ 'toggle-btn--active': openTimeLimit }"
+          @click="handleToggleLimit"
         >
           {{ openTimeLimit ? t('rateLimit.disableLimit') : t('rateLimit.enableLimit') }}
         </el-button>
         <el-slider
           v-if="openTimeLimit"
           :model-value="timeLimit"
-          @update:model-value="handleTimeLimitChange"
           show-input
           :min="1"
           :max="500"
           class="custom-slider"
+          @update:model-value="handleTimeLimitChange"
         />
       </div>
     </div>
@@ -193,36 +193,17 @@ const handleTimeoutChange = (value: number | undefined) => {
 </style>
 
 <style>
-html.dark .setting-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
-}
-
-html.dark .tooltip-icon {
-  color: #666666;
-}
-
-html.dark .tooltip-icon:hover {
-  color: #8ec5ff;
-}
-
+/* setting-section / section-header / tooltip-icon 的公共暗色适配已收敛至 common.css */
 html.dark .toggle-btn {
   color: #8a8a8a;
-  border-color: #2c2e30;
-  background: #000000;
+  border-color: var(--border-color);
+  background: var(--bg-page);
 }
 
 html.dark .toggle-btn:hover {
   color: #c0c0c0;
   border-color: #3c3e40;
-  background: #1a1a1a;
+  background: var(--bg-elevated);
 }
 
 html.dark .toggle-btn--active {
@@ -237,12 +218,12 @@ html.dark .toggle-btn--active:hover {
   color: #ffffff;
 }
 
-html.dark .custom-slider :deep(.el-slider__runway) {
-  background-color: #2c2e30;
+html.dark .custom-slider .el-slider__runway {
+  background-color: var(--border-color);
 }
 
-html.dark .custom-slider :deep(.el-slider__button) {
-  border-color: #1a1a1a;
+html.dark .custom-slider .el-slider__button {
+  border-color: var(--bg-page);
 }
 
 html.dark .timeout-hint {

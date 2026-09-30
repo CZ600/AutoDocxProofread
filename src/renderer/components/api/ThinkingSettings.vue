@@ -92,26 +92,7 @@ const handleChange = (value: 'default' | 'enabled' | 'disabled') => {
 </style>
 
 <style>
-html.dark .setting-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
-}
-
-html.dark .tooltip-icon {
-  color: #666666;
-}
-
-html.dark .tooltip-icon:hover {
-  color: #8ec5ff;
-}
-
+/* setting-section / section-header / tooltip-icon 的公共暗色适配已收敛至 common.css */
 html.dark .thinking-hint {
   color: #6f6f6f;
 }

@@ -200,14 +200,8 @@ onMounted(async () => {
   padding: 16px 20px;
   height: 100%;
   overflow-y: auto;
-  background: #ffffff;
-  --el-color-primary: #7b9eb8;
-  --el-color-primary-light-3: #a0bdd0;
-  --el-color-primary-light-5: #b8cedb;
-  --el-color-primary-light-7: #d0dfea;
-  --el-color-primary-light-8: #dde8ef;
-  --el-color-primary-light-9: #edf3f7;
-  --el-color-primary-dark-2: #6d8da6;
+  /* 品牌色覆盖已在 tokens.css 的 :root 全局定义，页面无需再带局部副本 */
+  background: var(--bg-page);
 }
 
 .api-settings-container :deep(.el-switch.is-checked .el-switch__core) {
@@ -500,71 +494,45 @@ onMounted(async () => {
 </style>
 
 <style>
+/* setting-section / section-header / tooltip-icon / btn-subtle 的公共暗色适配已收敛至 common.css；
+   非 scoped 块不能用 :deep()（浏览器整条丢弃规则），子元素直接写类名 */
 html.dark .api-settings-container {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
-html.dark .api-settings-container :deep(.el-divider__text) {
-  background-color: #000000;
+html.dark .api-settings-container .el-divider__text {
+  background-color: var(--bg-page);
 }
 
-html.dark .api-settings-container :deep(.el-divider) {
-  border-top-color: #2c2e30;
+html.dark .api-settings-container .el-divider {
+  border-top-color: var(--border-color);
 }
 
 html.dark .tab-content {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
-html.dark .custom-tabs :deep(.el-tabs__header) {
-  border-bottom-color: #2c2e30;
+html.dark .custom-tabs .el-tabs__header {
+  border-bottom-color: var(--border-color);
 }
 
-html.dark .custom-tabs :deep(.el-tabs__item) {
+html.dark .custom-tabs .el-tabs__item {
   color: #8a8a8a;
 }
 
-html.dark .custom-tabs :deep(.el-tabs__item.is-active) {
+html.dark .custom-tabs .el-tabs__item.is-active {
   color: #e0e0e0;
 }
 
-html.dark .custom-tabs :deep(.el-tabs__item:hover) {
+html.dark .custom-tabs .el-tabs__item:hover {
   color: #c0c0c0;
 }
 
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .tooltip-icon {
-  color: #666666;
-}
-
-html.dark .tooltip-icon:hover {
-  color: #8ec5ff;
-}
-
 html.dark .review-switch-label {
-  color: #c0c4cc;
+  color: var(--text-2);
 }
 
 html.dark .review-switch-hint {
   color: #6f6f6f;
-}
-
-html.dark .btn-subtle {
-  color: #8a8a8a;
-  border-color: #2c2e30;
-  background: #000000;
-}
-
-html.dark .btn-subtle:hover {
-  color: #c0c0c0;
-  border-color: #3c3e40;
-  background: #1a1a1a;
-}
-
-html.dark .setting-section {
-  background: #000000;
 }
 </style>

@@ -70,7 +70,7 @@
         layout="total, prev, pager, next"
         :hide-on-single-page="filteredHistory.length <= pageSize"
       />
-      <el-button size="small" @click="deleteAllHistory" :disabled="history.length === 0" class="btn-danger">
+      <el-button size="small" :disabled="history.length === 0" class="btn-danger" @click="deleteAllHistory">
         {{ t('history.deleteAll') }}
       </el-button>
     </div>
@@ -1044,24 +1044,25 @@ html.dark .no-corrections {
 </style>
 
 <style>
+/* 非 scoped 块不能用 :deep()（浏览器整条丢弃规则），子元素直接写类名 */
 html.dark .table-container {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
-html.dark .table :deep(.el-table__header th) {
-  background-color: #1a1a1a;
-  color: #c0c4cc;
+html.dark .table .el-table__header th {
+  background-color: var(--bg-elevated);
+  color: var(--text-2);
 }
 
-html.dark .table :deep(.el-table__row td) {
-  border-bottom-color: #2c2e30;
+html.dark .table .el-table__row td {
+  border-bottom-color: var(--border-color);
 }
 
-html.dark .table :deep(.el-table__row:hover > td) {
+html.dark .table .el-table__row:hover > td {
   background-color: #252525;
 }
 
 html.dark .morandi-dialog .el-dialog {
-  background-color: #1d1e1f;
+  background-color: var(--bg-panel);
 }
 </style>

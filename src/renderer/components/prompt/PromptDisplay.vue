@@ -113,30 +113,19 @@ const modeLabel = computed(() =>
 </style>
 
 <style>
-html.dark .setting-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
-}
-
+/* setting-section / section-header 的公共暗色适配已收敛至 common.css */
 html.dark .prompt-label {
   color: #c0c0c0;
 }
 
 html.dark .mode-tag {
-  background-color: #1a1a1a;
-  border-color: #2c2e30;
+  background-color: var(--bg-elevated);
+  border-color: var(--border-color);
   color: #8a8a8a;
 }
 
 html.dark .prompt-content {
-  background-color: #1a1a1a;
+  background-color: var(--bg-elevated);
   color: #a0a0a0;
 }
 

@@ -78,13 +78,13 @@
 
     <!-- 操作条：两卡共享同一份草稿，统一应用/撤销/重置 -->
     <div class="button-group">
-      <el-button @click="handleSave" :icon="Select" class="btn-save">
+      <el-button :icon="Select" class="btn-save" @click="handleSave">
         {{ t('promptEditor.apply') }}
       </el-button>
-      <el-button @click="resetDraft" :icon="RefreshLeft" class="btn-subtle">
+      <el-button :icon="RefreshLeft" class="btn-subtle" @click="resetDraft">
         {{ t('promptEditor.undo') }}
       </el-button>
-      <el-button @click="handleReset" :icon="Warning" class="btn-subtle">
+      <el-button :icon="Warning" class="btn-subtle" @click="handleReset">
         {{ t('promptEditor.resetDefault') }}
       </el-button>
     </div>
@@ -288,31 +288,21 @@ const handleReset = async () => {
 </style>
 
 <style>
-html.dark .setting-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
-}
-
-html.dark .radio-group :deep(.el-radio-button__inner) {
-  border-color: #2c2e30;
+/* setting-section / section-header / btn-subtle 的公共暗色适配已收敛至 common.css；
+   非 scoped 块不能用 :deep()（浏览器整条丢弃规则），子元素直接写类名 */
+html.dark .radio-group .el-radio-button__inner {
+  border-color: var(--border-color);
   color: #8a8a8a;
-  background: #000000;
+  background: var(--bg-page);
 }
 
-html.dark .radio-group :deep(.el-radio-button__inner:hover) {
+html.dark .radio-group .el-radio-button__inner:hover {
   color: #c0c0c0;
-  background: #1a1a1a;
+  background: var(--bg-elevated);
 }
 
 html.dark .custom-mode-row {
-  background: #1a1a1a;
+  background: var(--bg-elevated);
 }
 
 html.dark .custom-mode-title {
@@ -321,17 +311,5 @@ html.dark .custom-mode-title {
 
 html.dark .custom-mode-desc {
   color: #a0a0a0;
-}
-
-html.dark .btn-subtle {
-  color: #8a8a8a;
-  border-color: #2c2e30;
-  background: #000000;
-}
-
-html.dark .btn-subtle:hover {
-  color: #c0c0c0;
-  border-color: #3c3e40;
-  background: #1a1a1a;
 }
 </style>

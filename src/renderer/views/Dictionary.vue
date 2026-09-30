@@ -517,24 +517,18 @@ onMounted(async () => {
 </style>
 
 <style>
+/* section-header 公共暗色适配已收敛至 common.css；
+   非 scoped 块不能用 :deep()（浏览器整条丢弃规则），子元素直接写类名 */
 html.dark .dictionary-panel {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 html.dark .panel-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
+  background-color: var(--bg-page);
 }
 
 html.dark .repo-item {
-  background: #1a1a1a;
+  background: var(--bg-elevated);
 }
 
 html.dark .repo-item:hover {
@@ -546,16 +540,16 @@ html.dark .repo-item.active {
 }
 
 html.dark .repo-name {
-  color: #c0c4cc;
+  color: var(--text-2);
 }
 
-html.dark .detail-section :deep(.el-table__header th) {
-  background-color: #1a1a1a;
-  color: #c0c4cc;
+html.dark .detail-section .el-table__header th {
+  background-color: var(--bg-elevated);
+  color: var(--text-2);
 }
 
-html.dark .detail-section :deep(.el-table__row td) {
-  border-bottom-color: #2c2e30;
+html.dark .detail-section .el-table__row td {
+  border-bottom-color: var(--border-color);
 }
 
 html.dark .repository-list::-webkit-scrollbar-thumb {

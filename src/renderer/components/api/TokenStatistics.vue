@@ -15,7 +15,7 @@
           </div>
         </template>
       </el-statistic>
-      <el-button :icon="Delete" @click="handleReset" class="btn-reset">
+      <el-button :icon="Delete" class="btn-reset" @click="handleReset">
         {{ t('tokenStats.clearStats') }}
       </el-button>
     </div>
@@ -106,31 +106,12 @@ const handleReset = () => {
 </style>
 
 <style>
-html.dark .setting-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
-}
-
-html.dark .statistic :deep(.el-statistic__number) {
+/* setting-section / section-header / tooltip-icon 的公共暗色适配已收敛至 common.css */
+html.dark .statistic .el-statistic__number {
   color: #e0e0e0;
 }
 
 html.dark .statistic-title {
   color: #a0a0a0;
-}
-
-html.dark .tooltip-icon {
-  color: #666666;
-}
-
-html.dark .tooltip-icon:hover {
-  color: #8ec5ff;
 }
 </style>

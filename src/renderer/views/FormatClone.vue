@@ -1151,27 +1151,18 @@ defineExpose({
   transition: width 0.5s ease;
 }
 
-/* ---- Format list (scrollable results) ---- */
+/* ---- Format list (scrollable results) ----
+   滚动条策略批次 7 已统一：全局细滚动条明暗均显示，不再局部隐藏 */
 .format-list {
   flex: 4;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.format-list::-webkit-scrollbar {
-  display: none;
 }
 
 .defaults-section {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.defaults-section::-webkit-scrollbar {
-  display: none;
 }
 
 .format-item-header {
@@ -1405,136 +1396,136 @@ defineExpose({
 }
 
 /* ---- Dark mode overrides ---- */
-.dark .format-clone-panel {
-  background-color: #1a1a2e;
+html.dark .format-clone-panel {
+  background-color: var(--bg-page);
 }
 
-.dark .clone-header {
+html.dark .clone-header {
   border-bottom-color: #2c2e30;
 }
 
-.dark .header-title {
+html.dark .header-title {
   color: #c0c8d0;
 }
 
-.dark .input-label {
+html.dark .input-label {
   color: #c0c8d0;
 }
 
-.dark .ref-file-name {
+html.dark .ref-file-name {
   color: #a0a8b4;
 }
 
-.dark .clear-icon {
+html.dark .clear-icon {
   color: #6a7078;
 }
 
-.dark .clear-icon:hover {
+html.dark .clear-icon:hover {
   color: #f56c6c;
 }
 
-.dark .desc-textarea {
+html.dark .desc-textarea {
   color: #c0c8d0;
   background: #2a2a3a;
   border-color: #3a3a4a;
 }
 
-.dark .desc-textarea:focus {
+html.dark .desc-textarea:focus {
   border-color: #7b9eb8;
   background: #1f1f33;
 }
 
-.dark .desc-textarea::placeholder {
+html.dark .desc-textarea::placeholder {
   color: #6a7078;
 }
 
-.dark .hint-text {
+html.dark .hint-text {
   color: #6a7078;
 }
 
-.dark .inline-progress-bar :deep(.el-progress-bar__outer) {
+html.dark .inline-progress-bar :deep(.el-progress-bar__outer) {
   background-color: #3a3a4a;
 }
 
-.dark .inline-progress-bar :deep(.el-progress-bar__inner) {
+html.dark .inline-progress-bar :deep(.el-progress-bar__inner) {
   background-color: #7b9eb8;
 }
 
-.dark .format-name {
+html.dark .format-name {
   color: #c0c8d0;
 }
 
-.dark .format-type-badge {
+html.dark .format-type-badge {
   color: #8890a0;
 }
 
-.dark .style-section strong {
+html.dark .style-section strong {
   color: #a0bdd0;
 }
 
-.dark .prop-key {
+html.dark .prop-key {
   color: #8890a0;
 }
 
-.dark .prop-val {
+html.dark .prop-val {
   color: #a0a8b4;
 }
 
-.dark .toggle-btn {
+html.dark .toggle-btn {
   border-color: #3a3a4a;
   background: #2a2a3a;
   color: #8890a0;
 }
 
-.dark .toggle-btn.on {
+html.dark .toggle-btn.on {
   background: rgba(103, 194, 58, 0.15);
   border-color: #67c23a;
   color: #67c23a;
 }
 
-.dark .step-btn {
+html.dark .step-btn {
   border-color: #3a3a4a;
   background: #2a2a3a;
   color: #a0a8b4;
 }
 
-.dark .step-btn:hover {
+html.dark .step-btn:hover {
   background: #3a3a4a;
 }
 
-.dark .color-chip {
+html.dark .color-chip {
   border-color: #3a3a4a;
 }
 
-.dark .color-chip:hover {
+html.dark .color-chip:hover {
   border-color: #6a7078;
 }
 
-.dark .spacing-label {
+html.dark .spacing-label {
   color: #6a7078;
 }
 
-.dark .spacing-other {
+html.dark .spacing-other {
   color: #a0a8b4;
 }
 
-.dark .result-summary {
+html.dark .result-summary {
   color: #8890a0;
 }
 
-.dark .action-bar-bottom {
+html.dark .action-bar-bottom {
   border-top-color: #2c2e30;
 }
 
-.dark .detail-row {
+html.dark .detail-row {
   color: #a0a8b4;
 }
 
-.dark .force-overwrite-row :deep(.el-checkbox__label) {
+html.dark .force-overwrite-row :deep(.el-checkbox__label) {
   color: #a0a8b4;
 }
 
-.dark .info-icon {
+html.dark .info-icon {
   color: #6a7078;
 }
 </style>

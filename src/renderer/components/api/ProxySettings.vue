@@ -13,18 +13,18 @@
         <el-form-item :label="t('proxy.enableProxy')" class="form-item-enhanced">
           <el-switch
             :model-value="proxyEnabled_"
-            @update:model-value="handleProxyToggle"
             :active-text="t('proxy.enabled')"
             :inactive-text="t('proxy.disabled')"
+            @update:model-value="handleProxyToggle"
           />
         </el-form-item>
         <el-form-item v-if="proxyEnabled_" :label="t('proxy.proxyPort')" class="form-item-enhanced">
           <el-input-number
             :model-value="proxyPort_"
-            @update:model-value="handleProxyPortChange"
             :min="1"
             :max="65535"
             :step="1"
+            @update:model-value="handleProxyPortChange"
           />
         </el-form-item>
       </el-form>
@@ -124,23 +124,5 @@ const handleProxyPortChange = (value: number) => {
 </style>
 
 <style>
-html.dark .setting-section {
-  background-color: #000000;
-}
-
-html.dark .section-header {
-  color: #c0c4cc;
-}
-
-html.dark .section-header .el-icon {
-  color: #8ec5ff;
-}
-
-html.dark .tooltip-icon {
-  color: #666666;
-}
-
-html.dark .tooltip-icon:hover {
-  color: #8ec5ff;
-}
+/* setting-section / section-header / tooltip-icon 的公共暗色适配已收敛至 common.css */
 </style>

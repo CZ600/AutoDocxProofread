@@ -542,21 +542,21 @@ onUnmounted(() => {
 }
 
 html.dark .correction-item {
-  background-color: #1d1e1f;
-  border-color: #2c2e30;
+  background-color: var(--bg-panel);
+  border-color: var(--border-color);
 }
 
 html.dark .correction-item:hover {
-  border-color: #4c4d4f;
+  border-color: var(--border-strong);
 }
 
 html.dark .correction-header {
-  background-color: #1d1e1f;
+  background-color: var(--bg-panel);
 }
 
 html.dark .correction-content {
-  background-color: #141414;
-  border-top-color: #2c2e30;
+  background-color: var(--bg-sunken);
+  border-top-color: var(--border-color);
 }
 
 html.dark .correction-content > div {
@@ -568,7 +568,7 @@ html.dark .correction-content strong {
 }
 
 html.dark .actions {
-  border-top-color: #2c2e30;
+  border-top-color: var(--border-color);
 }
 
 html.dark .correction-item-rejected {
@@ -577,7 +577,7 @@ html.dark .correction-item-rejected {
 
 html.dark .correction-rejected-tag {
   color: #8a929e;
-  border-color: #4c4d4f;
+  border-color: var(--border-strong);
 }
 
 html.dark .edit-icon {
@@ -606,7 +606,7 @@ html.dark .reference-content h4 {
 }
 
 html.dark .proof-results-panel {
-  background-color: #141414;
+  background-color: var(--bg-panel);
 }
 
 html.dark .correction-item:hover {
@@ -614,20 +614,20 @@ html.dark .correction-item:hover {
 }
 
 html.dark .results-container {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 html.dark .el-collapse {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 html.dark .el-collapse-item {
-  border-color: #2c2e30;
+  border-color: var(--border-color);
 }
 
 html.dark .el-collapse-item__header {
-  background-color: #1a1a1a;
-  color: #c0c4cc;
+  background-color: var(--bg-elevated);
+  color: var(--text-2);
 }
 
 html.dark .el-collapse-item__header:hover {
@@ -635,7 +635,7 @@ html.dark .el-collapse-item__header:hover {
 }
 
 html.dark .el-collapse-item__wrap {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 html.dark .el-collapse-item__header.is-active {
@@ -669,8 +669,7 @@ html.dark .el-collapse-item__header.is-active {
 .results-container {
   flex: 1;
   padding: 12px;
-  overflow-y: scroll;
-  scrollbar-width: none;
+  overflow-y: auto;
 }
 
 .reference-content {

@@ -141,7 +141,7 @@
             <el-descriptions-item :label="t('about.tech.docProcessing')">
               <el-link href="https://github.com/mwilliamson/mammoth.js" target="_blank">Mammoth</el-link> +
               <el-link href="https://github.com/open-xml-templating/docxtemplater" target="_blank"
-                >Docxtemplater</el-link
+              >Docxtemplater</el-link
               >
             </el-descriptions-item>
             <el-descriptions-item :label="t('about.tech.vectorDB')">
@@ -153,7 +153,7 @@
             </el-descriptions-item>
             <el-descriptions-item :label="t('about.tech.versionControl')">
               <el-link href="https://github.com/conventional-changelog/standard-version" target="_blank"
-                >Standard Version</el-link
+              >Standard Version</el-link
               >
             </el-descriptions-item>
           </el-descriptions>
@@ -426,36 +426,37 @@ const activeCollapse = ref('1')
 </style>
 
 <style>
+/* 非 scoped 块不能用 :deep()（浏览器整条丢弃规则），子元素直接写类名 */
 html.dark .about-container {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 html.dark .tab-card {
-  background-color: #000000;
+  background-color: var(--bg-page);
 }
 
 html.dark .content-tabs .code-block {
-  background-color: #1d1e1f;
-  border-color: #2c2e30;
+  background-color: var(--bg-panel);
+  border-color: var(--border-color);
 }
 
 html.dark .content-tabs .code-block code {
   color: #e0e0e0;
 }
 
-html.dark .content-tabs :deep(.el-tabs__header) {
-  border-bottom-color: #2c2e30;
+html.dark .content-tabs .el-tabs__header {
+  border-bottom-color: var(--border-color);
 }
 
-html.dark .content-tabs :deep(.el-tabs__item) {
+html.dark .content-tabs .el-tabs__item {
   color: #8a8a8a;
 }
 
-html.dark .content-tabs :deep(.el-tabs__item.is-active) {
+html.dark .content-tabs .el-tabs__item.is-active {
   color: #e0e0e0;
 }
 
-html.dark .content-tabs :deep(.el-tabs__item:hover) {
+html.dark .content-tabs .el-tabs__item:hover {
   color: #c0c0c0;
 }
 
@@ -479,8 +480,8 @@ html.dark .content-tabs p {
   color: #a0a0a0;
 }
 
-html.dark .flat-collapse :deep(.el-collapse-item__header) {
+html.dark .flat-collapse .el-collapse-item__header {
   color: #c0c0c0;
-  border-bottom-color: #2c2e30;
+  border-bottom-color: var(--border-color);
 }
 </style>
