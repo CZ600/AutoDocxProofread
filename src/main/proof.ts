@@ -1436,7 +1436,8 @@ export async function proofreadDocument(
         embeddingConfig,
         provider,
         chunk => streamSink?.chunk('proofread', 0, '', chunk),
-        cancelToken
+        cancelToken,
+        chunk => streamSink?.thinking('proofread', 0, '', chunk)
       )
       cancelToken?.throwIfCancelled()
       total_tokens += use_tokens
