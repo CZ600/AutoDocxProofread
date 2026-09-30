@@ -9,14 +9,30 @@
       </el-tooltip>
     </div>
     <div class="setting-body">
-      <el-button
-        :type="openTimeLimit ? 'primary' : 'default'"
-        @click="handleToggleLimit"
-        class="toggle-btn"
-        :class="{ 'toggle-btn--active': openTimeLimit }"
-      >
-        {{ openTimeLimit ? t('rateLimit.disableLimit') : t('rateLimit.enableLimit') }}
-      </el-button>
+      <!-- 紧凑布局：开关按钮与超时设置同一行，滑杆条件显示在最下 -->
+      <div class="limit-row">
+        <el-button
+          :type="openTimeLimit ? 'primary' : 'default'"
+          @click="handleToggleLimit"
+          class="toggle-btn"
+          :class="{ 'toggle-btn--active': openTimeLimit }"
+        >
+          {{ openTimeLimit ? t('rateLimit.disableLimit') : t('rateLimit.enableLimit') }}
+        </el-button>
+        <div class="timeout-row">
+          <span class="timeout-label">{{ t('rateLimit.timeoutLabel') }}</span>
+          <el-input-number
+            :model-value="requestTimeoutSec ?? 300"
+            :min="5"
+            :max="3600"
+            :step="5"
+            controls-position="right"
+            class="timeout-input"
+            @update:model-value="handleTimeoutChange"
+          />
+          <span class="timeout-hint">{{ t('rateLimit.timeoutHint') }}</span>
+        </div>
+      </div>
       <el-slider
         v-if="openTimeLimit"
         :model-value="timeLimit"
@@ -26,20 +42,6 @@
         :max="500"
         class="custom-slider"
       />
-
-      <div class="timeout-row">
-        <span class="timeout-label">{{ t('rateLimit.timeoutLabel') }}</span>
-        <el-input-number
-          :model-value="requestTimeoutSec ?? 300"
-          :min="5"
-          :max="3600"
-          :step="5"
-          controls-position="right"
-          class="timeout-input"
-          @update:model-value="handleTimeoutChange"
-        />
-        <span class="timeout-hint">{{ t('rateLimit.timeoutHint') }}</span>
-      </div>
     </div>
   </div>
 </template>
@@ -99,9 +101,17 @@ const handleTimeoutChange = (value: number | undefined) => {
   color: #7b9eb8;
 }
 
+/* 开关按钮与超时设置同行，剩余空间隔开 */
+.limit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .toggle-btn {
   min-width: 140px;
-  margin-bottom: 20px;
   font-weight: 500;
   color: #5b7c99;
   border-color: #c5d3de;
@@ -128,15 +138,15 @@ const handleTimeoutChange = (value: number | undefined) => {
 }
 
 .custom-slider {
-  margin: 16px 0;
-  padding: 10px;
+  margin: 4px 0 0;
+  padding: 0;
 }
 
 .timeout-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 4px;
+  margin-top: 0;
   flex-wrap: wrap;
 }
 

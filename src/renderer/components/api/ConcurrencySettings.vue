@@ -67,8 +67,8 @@ const handleParallelChange = (value: number) => {
 }
 
 .custom-slider {
-  margin: 16px 0;
-  padding: 10px;
+  margin: 0;
+  padding: 0;
 }
 
 .custom-slider :deep(.el-slider__runway) {
