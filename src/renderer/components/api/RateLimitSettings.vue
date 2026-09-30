@@ -1,16 +1,16 @@
 <template>
-  <div class="setting-section">
-    <div class="section-header">
-      <el-icon><Timer /></el-icon>
-      <span>{{ t('rateLimit.title') }}</span>
-      <!-- 说明文字改为悬停提示：与 TokenStatistics 的累计Token问号提示同一样式 -->
-      <el-tooltip effect="dark" :content="t('rateLimit.description')" placement="top" popper-class="settings-hint-popper">
-        <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
-      </el-tooltip>
-    </div>
-    <div class="setting-body">
-      <!-- 紧凑布局：开关按钮与超时设置同一行，滑杆条件显示在最下 -->
-      <div class="limit-row">
+  <div class="rate-limit-block">
+    <!-- 卡片一：每分钟请求数上限（频率限制开关 + 限速滑杆） -->
+    <div class="setting-section">
+      <div class="section-header">
+        <el-icon><Timer /></el-icon>
+        <span>{{ t('rateLimit.title') }}</span>
+        <!-- 说明文字改为悬停提示：与 TokenStatistics 的累计Token问号提示同一样式 -->
+        <el-tooltip effect="dark" :content="t('rateLimit.description')" placement="top" popper-class="settings-hint-popper">
+          <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
+        </el-tooltip>
+      </div>
+      <div class="setting-body">
         <el-button
           :type="openTimeLimit ? 'primary' : 'default'"
           @click="handleToggleLimit"
@@ -19,36 +19,43 @@
         >
           {{ openTimeLimit ? t('rateLimit.disableLimit') : t('rateLimit.enableLimit') }}
         </el-button>
-        <div class="timeout-row">
-          <span class="timeout-label">{{ t('rateLimit.timeoutLabel') }}</span>
-          <el-input-number
-            :model-value="requestTimeoutSec ?? 300"
-            :min="5"
-            :max="3600"
-            :step="5"
-            controls-position="right"
-            class="timeout-input"
-            @update:model-value="handleTimeoutChange"
-          />
-          <span class="timeout-hint">{{ t('rateLimit.timeoutHint') }}</span>
-        </div>
+        <el-slider
+          v-if="openTimeLimit"
+          :model-value="timeLimit"
+          @update:model-value="handleTimeLimitChange"
+          show-input
+          :min="1"
+          :max="500"
+          class="custom-slider"
+        />
       </div>
-      <el-slider
-        v-if="openTimeLimit"
-        :model-value="timeLimit"
-        @update:model-value="handleTimeLimitChange"
-        show-input
-        :min="1"
-        :max="500"
-        class="custom-slider"
-      />
+    </div>
+
+    <!-- 卡片二：单请求超时（超时判定与失败处理说明） -->
+    <div class="setting-section">
+      <div class="section-header">
+        <el-icon><AlarmClock /></el-icon>
+        <span>{{ t('rateLimit.timeoutTitle') }}</span>
+      </div>
+      <div class="setting-body timeout-row">
+        <el-input-number
+          :model-value="requestTimeoutSec ?? 300"
+          :min="5"
+          :max="3600"
+          :step="5"
+          controls-position="right"
+          class="timeout-input"
+          @update:model-value="handleTimeoutChange"
+        />
+        <span class="timeout-hint">{{ t('rateLimit.timeoutHint') }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Timer, QuestionFilled } from '@element-plus/icons-vue'
+import { Timer, QuestionFilled, AlarmClock } from '@element-plus/icons-vue'
 import { useApiSettings } from '../../composables/useApiSettings'
 
 const { t } = useI18n()
@@ -101,13 +108,11 @@ const handleTimeoutChange = (value: number | undefined) => {
   color: #7b9eb8;
 }
 
-/* 开关按钮与超时设置同行，剩余空间隔开 */
-.limit-row {
+/* 组件根：两张子卡片纵向排列，间距与设置组内卡片节奏一致 */
+.rate-limit-block {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
 .toggle-btn {
@@ -150,12 +155,6 @@ const handleTimeoutChange = (value: number | undefined) => {
   flex-wrap: wrap;
 }
 
-.timeout-label {
-  font-size: 13px;
-  color: #5b7c99;
-  font-weight: 500;
-}
-
 .timeout-input {
   width: 130px;
 }
@@ -186,7 +185,7 @@ const handleTimeoutChange = (value: number | undefined) => {
 }
 
 .setting-section {
-  margin-bottom: 20px;
+  margin-bottom: 0;
   padding: 16px 18px;
   border-radius: 8px;
   background: #ffffff;
@@ -244,10 +243,6 @@ html.dark .custom-slider :deep(.el-slider__runway) {
 
 html.dark .custom-slider :deep(.el-slider__button) {
   border-color: #1a1a1a;
-}
-
-html.dark .timeout-label {
-  color: #8a8a8a;
 }
 
 html.dark .timeout-hint {

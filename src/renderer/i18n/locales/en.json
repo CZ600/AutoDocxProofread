@@ -535,6 +535,7 @@
     "description": "Limit the number of requests sent to the model per minute. Default is unlimited. If your API provider has rate limits, enable this according to their requirements",
     "disableLimit": "Disable Limit",
     "enableLimit": "Enable Limit",
+    "timeoutTitle": "Request Timeout",
     "timeoutLabel": "Per-request timeout (seconds)",
     "timeoutHint": "Timed-out segments are treated as failed; default 300s"
   },

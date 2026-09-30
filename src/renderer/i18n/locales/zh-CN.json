@@ -535,6 +535,7 @@
     "description": "限制每分钟发送给模型的请求数，默认不限制。如果使用的接口有频率限制，请根据接口提供商的要求自行开启",
     "disableLimit": "关闭限制",
     "enableLimit": "开启限制",
+    "timeoutTitle": "单请求超时",
     "timeoutLabel": "单请求超时（秒）",
     "timeoutHint": "超时的分片按失败处理，默认 300 秒"
   },
