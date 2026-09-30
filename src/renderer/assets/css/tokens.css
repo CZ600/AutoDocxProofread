@@ -1,0 +1,109 @@
+/**
+ * 设计令牌（批次 7）：明/暗两套统一变量。
+ * 页面 / 面板 / 卡片背景、文本、边框、品牌色从这里取值；
+ * 新样式禁止再硬编码背景色（历史上 5 种暗色背景并存、品牌变量无暗色变体的根源）。
+ *
+ * 品牌色（--el-color-*）从原 common.css 的 #app 迁移到 :root：
+ * #app 的 ID 特异性会压过 Element Plus html.dark 的同名变量，
+ * 导致暗色下继续使用亮色 tint（light-3/5/7/8/9）；迁到 :root 后，
+ * html.dark 的同名定义自然胜出，暗色变体按 Element 暗色主题约定
+ * 「light-N 变暗、dark-2 变亮」给出。
+ */
+:root {
+  /* ---- 背景 ---- */
+  --bg-page: #ffffff; /* 主内容区页面背景 */
+  --bg-panel: #ffffff; /* 结构性面板：侧栏 / 顶栏 / 预览面板 */
+  --bg-elevated: #ffffff; /* 卡片 / 设置区块 */
+  --bg-sunken: #f4f6f9; /* 下沉区块：内容内衬、代码块底 */
+
+  /* ---- 文本 ---- */
+  --text-1: #303133;
+  --text-2: #5a6e80;
+  --text-3: #8a929e;
+
+  /* ---- 边框 ---- */
+  --border-color: #edf0f4;
+  --border-strong: #dcdfe6;
+
+  /* ---- 品牌 ---- */
+  --brand: #7b9eb8;
+  --brand-dark: #6d8da6;
+  --brand-bright: #8ec5ff; /* 暗色下的品牌高亮（图标 / 强调） */
+
+  /* ---- 布局 ---- */
+  --sidebar-width: 52px; /* App 侧栏与预览工具栏 fixed 定位共用 */
+  --titlebar-reserve: 158px; /* 顶栏右端预留给窗口控制按钮（3×46px + 间距） */
+
+  /* ---- Element Plus 品牌色覆盖（整组自 #app 迁入） ---- */
+  --el-color-primary: #7b9eb8;
+  --el-color-primary-light-3: #a0bdd0;
+  --el-color-primary-light-5: #b8cedb;
+  --el-color-primary-light-7: #d0dfea;
+  --el-color-primary-light-8: #dde8ef;
+  --el-color-primary-light-9: #edf3f7;
+  --el-color-primary-dark-2: #6d8da6;
+  --el-color-success: #8ab89e;
+  --el-color-success-light-3: #a5ccb4;
+  --el-color-success-light-5: #bbdaca;
+  --el-color-success-light-7: #d5e8dd;
+  --el-color-success-light-8: #e0eee5;
+  --el-color-success-light-9: #edf5f0;
+  --el-color-success-dark-2: #79a88d;
+  --el-color-danger: #c28a8a;
+  --el-color-danger-light-3: #d0a4a4;
+  --el-color-danger-light-5: #dab8b8;
+  --el-color-danger-light-7: #e6cccc;
+  --el-color-danger-light-8: #edd8d8;
+  --el-color-danger-light-9: #f4e8e8;
+  --el-color-danger-dark-2: #b07575;
+  --el-color-warning: #c2a86a;
+  --el-color-warning-light-3: #d0be8e;
+  --el-color-warning-light-5: #dacea4;
+  --el-color-warning-light-7: #e5ddc2;
+  --el-color-warning-light-8: #ebe6d2;
+  --el-color-warning-light-9: #f2efe4;
+  --el-color-warning-dark-2: #b09555;
+}
+
+html.dark {
+  /* ---- 背景：全应用统一的暗色三层次 ---- */
+  --bg-page: #121212;
+  --bg-panel: #1d1e1f;
+  --bg-elevated: #1a1a1a;
+  --bg-sunken: #141414;
+
+  /* ---- 文本 ---- */
+  --text-1: #e0e0e0;
+  --text-2: #c0c4cc;
+  --text-3: #8a929e;
+
+  /* ---- 边框 ---- */
+  --border-color: #2c2e30;
+  --border-strong: #4c4d4f;
+
+  /* ---- Element Plus 品牌色暗色变体：light-N 变暗（作暗底）、dark-2 变亮（作 hover） ---- */
+  --el-color-primary-light-3: #5f7f95;
+  --el-color-primary-light-5: #4a6375;
+  --el-color-primary-light-7: #354754;
+  --el-color-primary-light-8: #2a3943;
+  --el-color-primary-light-9: #1f2b33;
+  --el-color-primary-dark-2: #94bdd4;
+  --el-color-success-light-3: #6d9480;
+  --el-color-success-light-5: #557464;
+  --el-color-success-light-7: #3d5449;
+  --el-color-success-light-8: #30433b;
+  --el-color-success-light-9: #24322c;
+  --el-color-success-dark-2: #a3ccb2;
+  --el-color-danger-light-3: #9d6f6f;
+  --el-color-danger-light-5: #7c5757;
+  --el-color-danger-light-7: #5b3f3f;
+  --el-color-danger-light-8: #483232;
+  --el-color-danger-light-9: #362525;
+  --el-color-danger-dark-2: #d1a3a3;
+  --el-color-warning-light-3: #9b8755;
+  --el-color-warning-light-5: #7a6a43;
+  --el-color-warning-light-7: #594e31;
+  --el-color-warning-light-8: #463e27;
+  --el-color-warning-light-9: #342e1d;
+  --el-color-warning-dark-2: #d1ba85;
+}

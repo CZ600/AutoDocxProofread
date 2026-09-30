@@ -6,57 +6,83 @@ body,
   height: 100%;
 }
 
-#app {
-  --el-color-primary: #7b9eb8;
-  --el-color-primary-light-3: #a0bdd0;
-  --el-color-primary-light-5: #b8cedb;
-  --el-color-primary-light-7: #d0dfea;
-  --el-color-primary-light-8: #dde8ef;
-  --el-color-primary-light-9: #edf3f7;
-  --el-color-primary-dark-2: #6d8da6;
-  --el-color-success: #8ab89e;
-  --el-color-success-light-3: #a5ccb4;
-  --el-color-success-light-5: #bbdaca;
-  --el-color-success-light-7: #d5e8dd;
-  --el-color-success-light-8: #e0eee5;
-  --el-color-success-light-9: #edf5f0;
-  --el-color-success-dark-2: #79a88d;
-  --el-color-danger: #c28a8a;
-  --el-color-danger-light-3: #d0a4a4;
-  --el-color-danger-light-5: #dab8b8;
-  --el-color-danger-light-7: #e6cccc;
-  --el-color-danger-light-8: #edd8d8;
-  --el-color-danger-light-9: #f4e8e8;
-  --el-color-danger-dark-2: #b07575;
-  --el-color-warning: #c2a86a;
-  --el-color-warning-light-3: #d0be8e;
-  --el-color-warning-light-5: #dacea4;
-  --el-color-warning-light-7: #e5ddc2;
-  --el-color-warning-light-8: #ebe6d2;
-  --el-color-warning-light-9: #f2efe4;
-  --el-color-warning-dark-2: #b09555;
+/* 暗色画布：跟随 tokens（useDark 只在 html 上切 dark 类，全应用唯一暗色机制） */
+html.dark {
+  background-color: var(--bg-panel);
+  color: var(--text-1);
 }
 
-.dark {
-  background-color: #1d1e1f;
-  color: #ffffff;
+/* ---- 统一细滚动条：明暗主题均显示（批次 7 取消明色下隐藏滚动条的旧策略） ---- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.dark ::-webkit-scrollbar {
-  width: 6px;
+::-webkit-scrollbar-thumb {
+  background-color: #c9d2dc;
+  border-radius: 4px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb:hover {
+  background-color: #aebcc9;
+}
+
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+html.dark ::-webkit-scrollbar-thumb {
   background-color: #555;
-  border-radius: 3px;
 }
 
-.dark ::-webkit-scrollbar-track {
-  background-color: #2d2d2d;
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #666;
 }
 
-/* 设置卡片说明的悬停气泡（el-tooltip popper-class）：限定宽度避免长句拉成一行，
-   popper 挂在 body 层，只能放全局样式；供 TokenStatistics 同类的问号提示复用 */
+html.dark ::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+/* ---- 设置区公共暗色适配 ----
+   原 ConcurrencySettings / ThinkingSettings / ProxySettings / RateLimitSettings /
+   TokenStatistics / ApiSelector / PromptDisplay / PromptEditor / APISet / Dictionary
+   十个组件逐字重复的非 scoped 补丁收敛至此；类名是全应用约定俗成的公共类，
+   全局定义一次即可。背景取 tokens 变量。 */
+html.dark .setting-section {
+  background-color: var(--bg-elevated);
+}
+
+html.dark .section-header {
+  color: var(--text-2);
+}
+
+html.dark .section-header .el-icon {
+  color: var(--brand-bright);
+}
+
+html.dark .tooltip-icon {
+  color: #666666;
+}
+
+html.dark .tooltip-icon:hover {
+  color: var(--brand-bright);
+}
+
+/* 「低调按钮」公共暗色适配：APISet 与 PromptEditor 同款 */
+html.dark .btn-subtle {
+  color: #8a8a8a;
+  border-color: var(--border-color);
+  background: var(--bg-page);
+}
+
+html.dark .btn-subtle:hover {
+  color: #c0c0c0;
+  border-color: #3c3e40;
+  background: var(--bg-elevated);
+}
+
+/* ---- 设置卡片说明的悬停气泡（el-tooltip popper-class）：限定宽度避免长句拉成一行，
+   popper 挂在 body 层，只能放全局样式；供 TokenStatistics 同类的问号提示复用 ---- */
 .settings-hint-popper {
   max-width: 320px;
   line-height: 1.6;

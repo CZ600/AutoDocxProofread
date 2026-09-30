@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout" :class="{ dark: isDark }">
+  <div class="app-layout">
     <el-config-provider :locale="elementLocale">
       <aside class="sidebar">
         <div class="sidebar-top">
@@ -77,7 +77,7 @@
 </template>
 
 <script setup>
-import { computed, ref, provide, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, provide, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { HomeFilled, InfoFilled, Setting, Clock, Collection, Sunny, Moon } from '@element-plus/icons-vue'
 import { useDark, useToggle } from '@vueuse/core'
@@ -88,7 +88,8 @@ import en from 'element-plus/es/locale/lang/en'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/theme-chalk/dark/css-vars.css'
 import DocPreview from './components/DocPreview.vue'
-import FormatClone from './views/FormatClone.vue'
+// 格式克隆初始不可见且体量大，异步加载：首屏不拉取该 chunk
+const FormatClone = defineAsyncComponent(() => import('./views/FormatClone.vue'))
 
 const electronAPI = window.electronAPI
 const router = useRouter()
@@ -151,18 +152,14 @@ getEnv()
   height: 100vh;
   display: flex;
   overflow: hidden;
-  background-color: #ffffff;
-}
-
-.app-layout.dark {
-  background-color: #121212;
+  background-color: var(--bg-page);
 }
 
 .sidebar {
-  width: 52px;
-  background-color: #ffffff;
+  width: var(--sidebar-width);
+  background-color: var(--bg-panel);
   /* 与内容区的分隔线用内阴影绘制，避免边框撑宽 52px 定宽布局（action-bar fixed left:52px 依赖） */
-  box-shadow: inset -1px 0 0 #edf0f4;
+  box-shadow: inset -1px 0 0 var(--border-color);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -172,10 +169,10 @@ getEnv()
   -webkit-app-region: drag;
 }
 
-/* 深色模式：跟随顶栏/预览面板的深色底（dark 类挂在 .app-layout 上） */
-.dark .sidebar {
-  background-color: #1d1e1f;
-  box-shadow: inset -1px 0 0 #2c2e30;
+/* 深色模式：跟随顶栏/预览面板的深色底（useDark 在 html 上切 dark 类，scoped 下用 html.dark 前缀） */
+html.dark .sidebar {
+  background-color: var(--bg-panel);
+  box-shadow: inset -1px 0 0 var(--border-color);
 }
 
 .sidebar-top {
@@ -245,16 +242,16 @@ getEnv()
 }
 
 /* 深色模式下恢复深底按钮配色 */
-.dark .sidebar-btn {
+html.dark .sidebar-btn {
   color: #8fa3b4;
 }
 
-.dark .sidebar-btn:hover {
+html.dark .sidebar-btn:hover {
   background-color: rgba(123, 158, 184, 0.18);
   color: #a0bdd0;
 }
 
-.dark .sidebar-btn.active {
+html.dark .sidebar-btn.active {
   background-color: rgba(123, 158, 184, 0.22);
   color: #a0bdd0;
 }
@@ -275,13 +272,8 @@ getEnv()
   height: 52px;
   flex-shrink: 0;
   -webkit-app-region: drag;
-  background-color: #ffffff;
-  border-bottom: 1px solid #edf0f4;
-}
-
-.dark .top-toolbar {
-  background-color: #1d1e1f;
-  border-bottom-color: #2c2e30;
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .content-row {
@@ -295,11 +287,10 @@ getEnv()
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  background-color: #ffffff;
+  background-color: var(--bg-page);
 }
 
-.dark .function-panel {
-  background-color: #1a1a2e;
+html.dark .function-panel {
   color: #ffffff;
 }
 
@@ -307,21 +298,7 @@ getEnv()
   flex: 2;
   min-width: 0;
   overflow: hidden;
-  background-color: #ffffff;
-  border-left: 1px solid #edf0f4;
-}
-
-.dark .preview-panel {
-  background-color: #1d1e1f;
-  border-left-color: #2c2e30;
-}
-
-::-webkit-scrollbar {
-  display: none;
-}
-
-body {
-  overflow: -moz-scrollbars-none;
-  -ms-overflow-style: none;
+  background-color: var(--bg-panel);
+  border-left: 1px solid var(--border-color);
 }
 </style>
