@@ -27,8 +27,32 @@ files:
   # 运行时不再 require 外层 pdfjs-dist（已实测：隐藏 pdfjs-dist 后仍能正常解析 PDF）。
   # 外层这份是 npm 因 dependencies 声明而装的冗余副本。
   - '!**/node_modules/pdfjs-dist/**'
+  # 方案G：渲染进程专属依赖排除（~93 包，asar 约减 30MB）。
+  # 原理：renderer 代码已被 vite 全量打进 out/renderer 的 chunk，运行时不读 node_modules；
+  # 这些包只被 .vue/渲染层 import，主进程产物（out/main 实际 require 清单 + 全量字符串扫描）
+  # 已验证零引用。清单由「主进程依赖闭包」脚本计算：保留闭包外的全部包即排除项。
+  # ⚠️ 维护约定：往 src/main 新增第三方依赖后若启动报 Cannot find module，先核对本列表是否误伤。
+  # 注：@google/genai 及其 google-auth-library/gtoken/ws 等依赖链按批次4决策保留（迁移预留），未列入。
+  - '!**/node_modules/@babel/{helper-string-parser,helper-validator-identifier,parser,types}/**'
+  - '!**/node_modules/@ctrl/tinycolor/**'
+  - '!**/node_modules/@element-plus/icons-vue/**'
+  - '!**/node_modules/@floating-ui/{core,dom,utils}/**'
+  - '!**/node_modules/@intlify/{core-base,devtools-types,message-compiler,shared}/**'
+  - '!**/node_modules/@jridgewell/sourcemap-codec/**'
+  - '!**/node_modules/@popperjs/core/**'
+  - '!**/node_modules/@vue/{compiler-core,compiler-dom,compiler-sfc,compiler-ssr,devtools-api,devtools-kit,devtools-shared,reactivity,runtime-core,runtime-dom,server-renderer,shared}/**'
+  - '!**/node_modules/@vueuse/{core,metadata,shared}/**'
+  - '!**/node_modules/{async-validator,asynckit,axios,bezier-easing,birpc,call-bind-apply-helpers,combined-stream,copy-anything,core-util-is,csstype,dayjs,deep-pick-omit,defu,delayed-stream,destr,docx-preview}/**'
+  - '!**/node_modules/{dunder-proto,element-plus,entities,es-define-property,es-errors,es-object-atoms,es-set-tostringtag,escape-html,estree-walker,follow-redirects,form-data,function-bind,get-intrinsic,get-proto,gopd,has-symbols}/**'
+  - '!**/node_modules/{has-tostringtag,hasown,hookable,is-what,lodash,lodash-es,lodash-unified,magic-string,math-intrinsics,memoize-one,mime-db,mime-types,mitt,nanoid,normalize-wheel-es,perfect-debounce}/**'
+  - '!**/node_modules/{picocolors,pinia,pinia-plugin-persistedstate,postcss,process-nextick-args,proxy-from-env,rfdc,source-map-js,speakingurl,superjson,vue,vue-demi,vue-i18n,vue-router,vue-scrollto}/**'
 
 asar: true
+
+# Electron 默认带 55 种界面语言 .pak（~38MB），本应用仅中英双语 → 只保留两种
+electronLanguages:
+  - zh-CN
+  - en-US
 
 # 原生模块必须解包出 asar（.node / .dll 无法在 asar 内加载）。
 # 这里只解包 sqlite3（其原生绑定 node_sqlite3.node）。
@@ -45,10 +69,12 @@ extraResources:
   - from: node_modules/sqlite-vec-windows-x64
     to: sqlite-vec
     filter: ['**/*.dll']
-  # 窗口图标：main.ts 读取 process.resourcesPath/assets/logo.ico
+  # 窗口图标：main.ts 读取 process.resourcesPath/assets/logo.ico。
+  # 精确列出 ico（运行时用）与 icns（将来 mac 打包用）；
+  # README 文档截图与无引用的 logo.jpg/logo.png 不进安装包
   - from: assets
     to: assets
-    filter: ['**/*.ico', '**/*.png', '**/*.icns']
+    filter: ['logo.ico', 'logo.icns']
 
 win:
   # 方案F：只产出 NSIS 安装器，去掉 portable 便携版。
