@@ -197,14 +197,23 @@
 
 ### 任务清单
 
-- [ ] **忽略/编辑建议原位更新（核心）**：`DocPreview.vue:1356-1368` 监听 `fileStore.results`，任何变更都触发 `rerenderAndReapply()`（整篇 renderAsync + 重放全部替换 + 重建全部高亮）。撤销已有 `skipResultRerenderOnce` 豁免机制（`store.ts:63-71`），将其推广到：
+- [x] **忽略/编辑建议原位更新（核心）**：`DocPreview.vue:1356-1368` 监听 `fileStore.results`，任何变更都触发 `rerenderAndReapply()`（整篇 renderAsync + 重放全部替换 + 重建全部高亮）。撤销已有 `skipResultRerenderOnce` 豁免机制（`store.ts:63-71`），将其推广到：
   - 「忽略一条」（`Proof.vue:184-190`）：原位移除对应高亮 span 后置 skip 标记；
   - 「编辑建议文本保存」（`Proof.vue:164-181`）：原位更新替换文本后置 skip 标记。
   - **保守策略**：代码注释已指出含脚注段落的 DOM 结构差异会导致原位高亮匹配失败——先判断该 correction 是否落在脚注/复杂段落，是则仍走整篇重渲染，否则原位。
-- [ ] **高亮工具收敛与增量化**：`highlightCorrections` 在 `DocPreview.vue:471-500` 与 `Proof.vue:317-332` 各一份拷贝 → 收敛到 `src/renderer/utils/highlight.ts`；`correctionMatching.js:161-191` 的 `locateCorrectionsInPreview` 每次对全文 buildTextNodeMap（O(条数×全文长度)）→ 支持传入复用的 textNodeMap，apply/undo/ignore 后只重建受影响部分。
-- [ ] **base64 → ArrayBuffer 传输**：`ipcHandlers.ts:162-173` read-docx-file 整个 docx 转 base64 过 IPC（+33% 体积）→ 改返回 ArrayBuffer（Electron IPC structured clone 原生支持）；渲染层 `new Blob([buffer])`；删除 `DocPreview.vue:1007-1017` 与 `FormatClone.vue:657-666` 两份重复的 atob 逐字节双层循环。
-- [ ] **results 持久化节流**：`store.ts:88-92` 每次 results 变更全量 `JSON.stringify` 写 localStorage → debounce 500ms 或仅关键节点写。
-- [ ] **（可选）校对结果列表虚拟滚动**：`Proof.vue:3-111` 全量渲染所有 el-collapse-item（含 popover），`:key="index"` 配合整体替换数组致复用失效 → 固定高度容器 + `@vueuse/core` 的 useVirtualList；建议条数 >300 时再感知明显，优先级可后置。
+- [x] **高亮工具收敛与增量化**：`highlightCorrections` 在 `DocPreview.vue:471-500` 与 `Proof.vue:317-332` 各一份拷贝 → 收敛到 `src/renderer/utils/highlight.ts`；`correctionMatching.js:161-191` 的 `locateCorrectionsInPreview` 每次对全文 buildTextNodeMap（O(条数×全文长度)）→ 支持传入复用的 textNodeMap，apply/undo/ignore 后只重建受影响部分。
+- [x] **base64 → ArrayBuffer 传输**：`ipcHandlers.ts:162-173` read-docx-file 整个 docx 转 base64 过 IPC（+33% 体积）→ 改返回 ArrayBuffer（Electron IPC structured clone 原生支持）；渲染层 `new Blob([buffer])`；删除 `DocPreview.vue:1007-1017` 与 `FormatClone.vue:657-666` 两份重复的 atob 逐字节双层循环。
+- [x] **results 持久化节流**：`store.ts:88-92` 每次 results 变更全量 `JSON.stringify` 写 localStorage → debounce 500ms 或仅关键节点写。
+- [ ] **（可选）校对结果列表虚拟滚动**：`Proof.vue:3-111` 全量渲染所有 el-collapse-item（含 popover），`:key="index"` 配合整体替换数组致复用失效 → 固定高度容器 + `@vueuse/core` 的 useVirtualList；建议条数 >300 时再感知明显，优先级可后置。（**未实施**：计划标注优先级可后置，建议条数 >300 才感知明显，留待后续按需做。）
+
+**实施说明（2026-09-30）**：
+- **根因比计划描述的更深**：原 `skipWatcherRerender` 本地标记模式（`标记=true → 改 results → 标记=false`）对 Vue 默认 pre-flush 异步 watcher 不生效——watcher 回调执行时标记已复位，因此此前**每次**点击应用/忽略/编辑/批量应用都会整篇重渲染 docx。本批次改为 store 级一次性豁免标记：复用 `skipResultRerenderOnce`（DocPreview 消费，跳过整篇重渲染）+ 新增 `skipResultRehighlightOnce`（Proof.vue 消费，跳过整列表重高亮），两侧 watcher 各自消费自己的标记、与触发顺序无关；原位操作失败（定位不到等）不置豁免，由整篇重渲染兜底，行为与旧兜底路径一致。
+- **原位更新范围**：忽略=按 `data-correction-id` 原位解除高亮 span（不做文本定位，脚注等复杂段落天然安全，比计划设想的「脚注保守判断」更强；span 不存在时回退整篇重渲染）；编辑保存=仅改侧栏展示的建议文本、预览 DOM 本就无需改动，纯豁免；单条应用/沿用原位替换路径（`applyAndHighlightCorrections`），恢复忽略=仅重建高亮不重渲染文档；单条/批量撤销沿用 `undoCorrectionsInPreview` 原位回退。
+- **高亮收敛与单趟化**：新建 `src/renderer/utils/highlight.js`（计划写的 .ts，随 correctionMatching.js 惯例用 .js），两份 `highlightCorrections` 拷贝收敛（点击去向以 `onHighlightClick` 回调参数化：预览侧→`requestSidebarFocus`，列表侧→滚动聚焦）；新增 `applyAndHighlightCorrections` 单趟完成「替换 targets + 重高亮其余 pending」——合并定位一次、按结果列表下标排序保持「重复文本按出现次序分配」约定、start 降序一趟消费各区间；单条应用从「替换定位 + 手动重高亮 + watcher 重高亮」3 次全文定位 + 整篇重渲染降为 1 次定位、0 次重渲染；`locateCorrectionsInPreview` 增加可选 `textNodeMap` 入参供复用；顺带删除已无消费方的 `replaceCorrectionInPreview`。
+- **ArrayBuffer**：`read-docx-file` 直接返回 `fs.readFile` 的 Buffer（IPC 结构化克隆），DocPreview/FormatClone 改 `new Blob([fileData.buffer])`，删除两份 atob 逐字节双层循环；`electron.d.ts` 同步并顺带修正缺失的 `Promise` 返回类型。
+- **持久化节流**：fileInfo store 的 persist storage 换为 `DebouncedStorage`（500ms 尾沿合并写入，`beforeunload` 冲刷兜底，`getItem` 优先返回挂起最新值）；容量超限降级逻辑（safeLocalStorage 丢大字段重试）不变。
+- 验证：改动文件 eslint 无新增问题（存量 12 error 为 ipcHandlers 行内 require ×11 与 Proof 组件名单词 ×1 的历史遗留）；`npm test` 144 通过 / 20 失败（失败集合与基线完全一致，均为既有真实 LLM 集成用例）；`npm run build` 绿。
+- 待人工回归：500+ 条建议文档连续点击忽略/编辑/应用/撤销流畅度；20MB 级 docx 打开预览提速；校对全流程（应用→撤销→忽略→编辑→导出）功能无异常、脚注段落高亮仍正确。
 
 ### 验收标准
 
