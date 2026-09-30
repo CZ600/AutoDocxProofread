@@ -184,12 +184,6 @@ const handleTimeoutChange = (value: number | undefined) => {
 </style>
 
 <style>
-/* 说明文字气泡：限定宽度避免长句拉成一行（popper 挂在 body 层，需全局样式） */
-.settings-hint-popper {
-  max-width: 320px;
-  line-height: 1.6;
-}
-
 html.dark .setting-section {
   background-color: #000000;
 }

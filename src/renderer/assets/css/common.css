@@ -54,3 +54,10 @@ body,
 .dark ::-webkit-scrollbar-track {
   background-color: #2d2d2d;
 }
+
+/* 设置卡片说明的悬停气泡（el-tooltip popper-class）：限定宽度避免长句拉成一行，
+   popper 挂在 body 层，只能放全局样式；供 TokenStatistics 同类的问号提示复用 */
+.settings-hint-popper {
+  max-width: 320px;
+  line-height: 1.6;
+}
