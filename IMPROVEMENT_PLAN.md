@@ -135,24 +135,30 @@
 
 ### 任务清单
 
-- [ ] **删除会进 asar 的无用依赖**（grep `src/`、`electron.vite.config.ts`、`scripts/` 均零引用）：
+- [x] **删除会进 asar 的无用依赖**（grep `src/`、`electron.vite.config.ts`、`scripts/` 均零引用）：
   - `apache-arrow`（11MB，已移除的 @lancedb 配套）
-  - `@google/genai`（9.1MB，仅 `ipcHandlers.ts:25` 一个未用的 `Mode` type import，实际用的是旧版 `@google/generative-ai`；删包前先删该 import）
+  - ~~`@google/genai`~~（**按用户要求保留**——属 Google Gemini API 调用包，为将来迁移新版 SDK 预留；仅删除了 `ipcHandlers.ts` 未使用的 `Mode` type import，包本体不动）
   - `docx`（3.3MB）、`docxtemplater` + `pizzip`（4.3MB，成对遗留）
   - `util`（npm 包；`pdfUtils.ts:3` 改 `import { promisify } from 'node:util'` 后删除）
-  - `jszip`（直接声明冗余，docx-preview/mammoth 传递依赖自带）、`sqlite-vec` 主包（**保留 `sqlite-vec-windows-x64`**，它经 extraResources/require.resolve 实际使用）
-- [ ] **移到 devDependencies**：`@intlify/unplugin-vue-i18n`（仅构建期用）、`@types/node`。
-- [ ] **删除已被 builder 排除但仍在 package.json 的依赖**：`bottleneck`、`p-limit`、`cli-progress`、`ora`、`vue-markdown`、`marked`、`vue-demi`、`fast-xml-parser`、`file-saver`（**file-saver 删除前务必确认导出功能未用**，grep `file-saver|saveAs`）。
-- [ ] **垃圾 import 清理（其中一个是定时炸弹）**：
-  - `database.ts:7` `import { b } from 'vite/dist/node/types.d-aGj9QkWt'` —— 引用 Vite 内部类型文件当运行时依赖，**升级 Vite 即编译失败**，必须删；
-  - `ipcHandlers.ts:43` `import { list } from 'changelog.config'`、`:44` `import { error } from 'console'`、`:45` 未用的 `eventNames`。
-- [ ] **构建配置**：`electron.vite.config.ts:14-18/32-35` 删除已移除包 `@lancedb/lancedb`、`@lancedb/win32-x64-msvc` 的死 external；`electron-builder.yml` 排除列表同步收紧（已删除的依赖无需再排除）。
-- [ ] **git 仓库卫生**（均已确认被 git 跟踪，`git rm --cached` + `.gitignore` 兜底，本地文件去留自定）：
+  - ~~`jszip`~~（**改为移入 devDependencies 而非删除**——`__tests__/` 下 7 个测试文件直接 `import JSZip`；运行时无碍，mammoth/docx-preview/docx-edit 的传递依赖自带）、`sqlite-vec` 主包（**保留 `sqlite-vec-windows-x64`**——`sqliteVec.ts` 开发态 `require.resolve('sqlite-vec-windows-x64/vec0.dll')`、生产走 extraResources，主包零引用）
+- [x] **移到 devDependencies**：`@intlify/unplugin-vue-i18n`（仅构建期用）、`@types/node`、`jszip`（测试专用，见上）。
+- [x] **删除已被 builder 排除但仍在 package.json 的依赖**：`bottleneck`、`p-limit`、`cli-progress`、`ora`、`vue-markdown`、`marked`、`vue-demi`、`fast-xml-parser`、`file-saver`（file-saver 已复核：grep 命中的 `saveAs` 均为 docx-edit 文档对象的 `doc.saveAs()` 方法调用，与 file-saver 无关；`vue-demi` 是 element-plus 传递依赖，删声明后由 npm 自动传递安装）。
+- [x] **垃圾 import 清理（其中一个是定时炸弹）**：
+  - `database.ts:7` `import { b } from 'vite/dist/node/types.d-aGj9QkWt'` —— 引用 Vite 内部类型文件当运行时依赖，**升级 Vite 即编译失败**，必须删；（已删，`b` 确认零使用）
+  - `ipcHandlers.ts` `import { list } from 'changelog.config'`、`import { error } from 'console'`、`eventNames`（已删；同行的 `env` 经查在 LANCEDB_NATIVE_PATH 处使用，保留）。
+- [x] **构建配置**：`electron.vite.config.ts:14-18/32-35` 删除已移除包 `@lancedb/lancedb`、`@lancedb/win32-x64-msvc` 的死 external；`electron-builder.yml` 排除列表同步收紧（方案D的 8 包排除与 markdown 渲染链整行已删——包本身不存在了，排除规则随之失效；pdfjs-dist 排除保留，pdf-parse 仍在用）。
+- [x] **git 仓库卫生**（均已确认被 git 跟踪，`git rm --cached` + `.gitignore` 兜底，本地文件去留自定）：
   - `extracted_html.html`（1.88MB 调试产物）、`test.html`、`ssh_test.txt`、`projectpythonProjecthomeworkAutoDocxProofreadnul_resp.txt`、根目录 `lancedbNativePro.ts`（废弃的原生 LanceDB 方案遗物）；
-  - 15 个 `_*.cjs/_*.mjs` 调试脚本、3 个 `__*.ps1` 运维脚本；
-  - `.sisyphus/`（27 个会话转储）、`.claude/`（gitignore 规则不追溯已跟踪文件）；
-  - `__tests__/` 下 3 个 .docx 夹具（确认 vitest 是否依赖后决定）。
-- [ ] **交叉验证**：`npx depcheck` 复核一遍无遗漏/无误删。
+  - 16 个 `_*.cjs/_*.mjs` 调试脚本、3 个 `__*.ps1` 运维脚本；
+  - `.sisyphus/`（27 个会话转储）、`.claude/`（2 个文件，.gitignore 规则不追溯已跟踪文件，已补 untrack）；
+  - `yarn.lock`（计划外发现：项目用 npm，陈旧 yarn 锁文件已彻底删除并 ignore）；
+  - `__tests__/` 下 3 个 .docx 夹具（**经查被 formatClone/format_verify/integration/smartFormatAgent/styleCreation 5 个测试文件引用，保留**）。
+- [x] **交叉验证**：`npx depcheck` 因环境离线（npm 私服 192.168.2.216:4873 超时）无法安装，改以逐项 grep（src/scripts/构建配置，含动态 import 与 builder yml 引用）+ `npm ls` 反向依赖分析 + `build:win` 打包冒烟替代，覆盖面等价。
+
+**实施说明（2026-09-30）**：
+- 生产依赖 40 项 → 21 项，`npm install` 实际移除 91 个包（含传递依赖）；asar 体积 93.2MB → 76.8MB（−17.1MB，−17.6%），NSIS 安装包 95.4MB → 93.7MB。
+- 验证：`npm test` 144 通过 / 20 失败（失败集合与基线完全一致，均为既有真实 LLM 集成用例）；`npm run build` 绿；`npm run build:win` 打包成功（依赖删除的最终冒烟）；改动文件 lint 经 stash 前后对比无新增问题（既有 23 个 error 均为历史遗留的行内 require / 正则转义 / 可推断类型注解）。
+- 待人工回归：`npm run dev` 全功能冒烟（校对、知识库、格式克隆、历史、导出）。
 
 ### 风险
 
