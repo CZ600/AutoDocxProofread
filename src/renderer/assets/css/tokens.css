@@ -107,3 +107,54 @@ html.dark {
   --el-color-warning-light-9: #342e1d;
   --el-color-warning-dark-2: #d1ba85;
 }
+
+/* ---- 浅色模式皮肤（批次 7 后增）：仅非深色主题生效，只覆盖品牌主色阶梯 ----
+   :root[data-skin] 的特异性会压过 html.dark，因此统一加 :not(.dark) 守卫；
+   sky（晴空）即上方 :root 默认值，无需单独成块。色值与 src/shared/skins.ts 同步维护。 */
+html[data-skin='sakura']:not(.dark) {
+  --el-color-primary: #d4899d;
+  --el-color-primary-light-3: #dfa4b2;
+  --el-color-primary-light-5: #e9bcc6;
+  --el-color-primary-light-7: #f2d4da;
+  --el-color-primary-light-8: #f6e1e6;
+  --el-color-primary-light-9: #fbeef1;
+  --el-color-primary-dark-2: #bf7589;
+  --brand: #d4899d;
+  --brand-dark: #bf7589;
+}
+
+html[data-skin='mint']:not(.dark) {
+  --el-color-primary: #7cb392;
+  --el-color-primary-light-3: #98c4a9;
+  --el-color-primary-light-5: #b3d5c0;
+  --el-color-primary-light-7: #cee5d7;
+  --el-color-primary-light-8: #d9ede0;
+  --el-color-primary-light-9: #e9f5ee;
+  --el-color-primary-dark-2: #6aa081;
+  --brand: #7cb392;
+  --brand-dark: #6aa081;
+}
+
+html[data-skin='dusk']:not(.dark) {
+  --el-color-primary: #4d7ea8;
+  --el-color-primary-light-3: #7398b6;
+  --el-color-primary-light-5: #96b2c8;
+  --el-color-primary-light-7: #b8ccdb;
+  --el-color-primary-light-8: #c8d9e4;
+  --el-color-primary-light-9: #dbe6ee;
+  --el-color-primary-dark-2: #447094;
+  --brand: #4d7ea8;
+  --brand-dark: #447094;
+}
+
+html[data-skin='lemon']:not(.dark) {
+  --el-color-primary: #c4a465;
+  --el-color-primary-light-3: #d0ba8b;
+  --el-color-primary-light-5: #dcd0b0;
+  --el-color-primary-light-7: #e8e5d4;
+  --el-color-primary-light-8: #efeadd;
+  --el-color-primary-light-9: #f7f4ea;
+  --el-color-primary-dark-2: #b29355;
+  --brand: #c4a465;
+  --brand-dark: #b29355;
+}

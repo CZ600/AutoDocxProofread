@@ -46,7 +46,7 @@ const handleParallelChange = (value: number) => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -63,7 +63,7 @@ const handleParallelChange = (value: number) => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .custom-slider {
@@ -86,7 +86,7 @@ const handleParallelChange = (value: number) => {
 .custom-slider :deep(.el-slider__button) {
   width: 14px;
   height: 14px;
-  background-color: #7b9eb8;
+  background-color: var(--brand);
   border: 2px solid #ffffff;
   box-shadow: 0 1px 4px rgba(91, 124, 153, 0.25);
 }

@@ -47,7 +47,7 @@ const handleReset = () => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -81,7 +81,7 @@ const handleReset = () => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .btn-reset {

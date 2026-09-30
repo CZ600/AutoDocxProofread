@@ -353,7 +353,7 @@ const activeCollapse = ref('1')
 }
 
 .content-tabs :deep(.el-tabs__active-bar) {
-  background-color: #7b9eb8;
+  background-color: var(--brand);
   height: 2px;
   border-radius: 1px;
 }

@@ -696,7 +696,7 @@ html.dark .el-collapse-item__header.is-active {
   padding: 10px 14px;
   background: #f4f6f9;
   border-radius: 6px;
-  border-left: 3px solid #7b9eb8;
+  border-left: 3px solid var(--brand);
   line-height: 1.6;
   transition: all 0.2s ease;
 }
@@ -710,7 +710,7 @@ html.dark .el-collapse-item__header.is-active {
 }
 
 .reference-index {
-  color: #7b9eb8;
+  color: var(--brand);
   font-weight: 600;
   margin-right: 10px;
   min-width: 22px;
@@ -891,7 +891,7 @@ html.dark .el-collapse-item__header.is-active {
 
 .category-grammar,
 .category-语法 {
-  background-color: #7b9eb8;
+  background-color: var(--brand);
 }
 
 .category-consistency,

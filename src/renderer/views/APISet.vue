@@ -122,6 +122,29 @@
               <span class="review-switch-hint">{{ t('apiSettings.paperDarkAdaptHint') }}</span>
             </div>
           </div>
+
+          <div class="setting-section">
+            <div class="section-header">
+              <el-icon><Brush /></el-icon>
+              <span>{{ t('apiSettings.skinLabel') }}</span>
+              <el-tooltip effect="dark" :content="t('apiSettings.skinDesc')" placement="top" popper-class="settings-hint-popper">
+                <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </div>
+            <div class="skin-row">
+              <button
+                v-for="option in SKIN_OPTIONS"
+                :key="option.id"
+                type="button"
+                class="skin-swatch"
+                :class="{ active: skin === option.id }"
+                @click="handleSkinChange(option.id)"
+              >
+                <span class="skin-dot" :style="{ backgroundColor: option.color }" />
+                <span class="skin-name">{{ t(`apiSettings.${option.nameKey}`) }}</span>
+              </button>
+            </div>
+          </div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -132,7 +155,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { CircleCheck, Cpu, Select, Delete, Connection, QuestionFilled, View } from '@element-plus/icons-vue'
+import { CircleCheck, Cpu, Select, Delete, Connection, QuestionFilled, View, Brush } from '@element-plus/icons-vue'
 import ApiSelector from '../components/api/ApiSelector.vue'
 import AddApiDialog from '../components/api/AddApiDialog.vue'
 import TokenStatistics from '../components/api/TokenStatistics.vue'
@@ -145,6 +168,8 @@ import { useApiSettings, type ApiFormData } from '../composables/useApiSettings'
 import { useApiStore } from '../stores/apiStore'
 import { useLocaleStore } from '../stores/localeStore'
 import { fileInfoStore } from '../stores/store'
+import { useSkinStore, type SkinId } from '../stores/skinStore'
+import { SKIN_OPTIONS } from '../../shared/skins'
 
 const { t } = useI18n()
 const localeStore = useLocaleStore()
@@ -217,6 +242,13 @@ const paperDarkAdapt = computed({
   set: (value: boolean) => fileStore.setPreviewDarkAdapt(value)
 })
 
+// 浅色模式皮肤：持久化于 skinStore，App.vue 负责把值同步到 html[data-skin]
+const skinStore = useSkinStore()
+const skin = computed(() => skinStore.skin)
+const handleSkinChange = (id: SkinId) => {
+  skinStore.setSkin(id)
+}
+
 onMounted(async () => {
   await initApiSettings()
 })
@@ -232,8 +264,8 @@ onMounted(async () => {
 }
 
 .api-settings-container :deep(.el-switch.is-checked .el-switch__core) {
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
 }
 
 .api-settings-container :deep(.el-divider__text) {
@@ -261,16 +293,16 @@ onMounted(async () => {
 }
 
 .api-settings-container :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #7b9eb8 inset;
+  box-shadow: 0 0 0 1px var(--brand) inset;
 }
 
 .api-settings-container :deep(.el-select .el-input__wrapper.is-focus) {
-  box-shadow: 0 0 0 1px #7b9eb8 inset;
+  box-shadow: 0 0 0 1px var(--brand) inset;
 }
 
 .api-settings-container :deep(.el-checkbox__input.is-checked .el-checkbox__inner) {
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
 }
 
 .api-settings-container :deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
@@ -315,7 +347,7 @@ onMounted(async () => {
 }
 
 .custom-tabs :deep(.el-tabs__active-bar) {
-  background-color: #7b9eb8;
+  background-color: var(--brand);
   height: 2px;
   border-radius: 1px;
 }
@@ -394,7 +426,7 @@ onMounted(async () => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -407,7 +439,7 @@ onMounted(async () => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .review-switch-row {
@@ -506,6 +538,58 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+/* ---- 浅色模式皮肤色板 ---- */
+.skin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.skin-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 64px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.skin-swatch:hover {
+  background: var(--bg-sunken);
+}
+
+.skin-swatch.active {
+  background: var(--el-color-primary-light-9);
+  border-color: var(--el-color-primary-light-5);
+}
+
+.skin-dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65), 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.skin-swatch.active .skin-dot {
+  outline: 2px solid var(--el-color-primary);
+  outline-offset: 2px;
+}
+
+.skin-name {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.skin-swatch.active .skin-name {
+  color: var(--brand-dark);
+  font-weight: 600;
 }
 
 .lang-desc {

@@ -88,7 +88,7 @@ const handleTimeoutChange = (value: number | undefined) => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -105,7 +105,7 @@ const handleTimeoutChange = (value: number | undefined) => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 /* 组件根：两张子卡片纵向排列，间距与设置组内卡片节奏一致 */
@@ -131,14 +131,14 @@ const handleTimeoutChange = (value: number | undefined) => {
 }
 
 .toggle-btn--active {
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
   color: #ffffff;
 }
 
 .toggle-btn--active:hover {
-  background-color: #6d8da6;
-  border-color: #6d8da6;
+  background-color: var(--brand-dark);
+  border-color: var(--brand-dark);
   color: #ffffff;
 }
 
@@ -179,7 +179,7 @@ const handleTimeoutChange = (value: number | undefined) => {
 .custom-slider :deep(.el-slider__button) {
   width: 14px;
   height: 14px;
-  background-color: #7b9eb8;
+  background-color: var(--brand);
   border: 2px solid #ffffff;
   box-shadow: 0 1px 4px rgba(91, 124, 153, 0.25);
 }
@@ -207,14 +207,14 @@ html.dark .toggle-btn:hover {
 }
 
 html.dark .toggle-btn--active {
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
   color: #ffffff;
 }
 
 html.dark .toggle-btn--active:hover {
-  background-color: #6d8da6;
-  border-color: #6d8da6;
+  background-color: var(--brand-dark);
+  border-color: var(--brand-dark);
   color: #ffffff;
 }
 

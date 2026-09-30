@@ -681,7 +681,7 @@ onMounted(() => {
 }
 
 .stat-chip.active {
-  border-color: #7b9eb8;
+  border-color: var(--brand);
   color: #2f4a63;
   font-weight: 600;
 }
@@ -816,7 +816,7 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #7b9eb8;
+  background: var(--brand);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -975,7 +975,7 @@ html.dark .stat-chip {
 }
 
 html.dark .stat-chip.active {
-  border-color: #7b9eb8;
+  border-color: var(--brand);
   color: #8ec5ff;
 }
 

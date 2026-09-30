@@ -375,7 +375,7 @@ onMounted(async () => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .repository-list {

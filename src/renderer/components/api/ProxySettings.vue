@@ -91,7 +91,7 @@ const handleProxyPortChange = (value: number) => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -108,7 +108,7 @@ const handleProxyPortChange = (value: number) => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .form-item-enhanced {

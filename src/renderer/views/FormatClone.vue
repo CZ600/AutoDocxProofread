@@ -1117,7 +1117,7 @@ defineExpose({
 }
 
 .desc-textarea:focus {
-  border-color: #7b9eb8;
+  border-color: var(--brand);
   background: #ffffff;
 }
 
@@ -1147,7 +1147,7 @@ defineExpose({
 }
 
 .inline-progress-bar :deep(.el-progress-bar__inner) {
-  background-color: #7b9eb8;
+  background-color: var(--brand);
   transition: width 0.5s ease;
 }
 
@@ -1201,7 +1201,7 @@ defineExpose({
 .style-section strong {
   display: block;
   font-size: 12px;
-  color: #7b9eb8;
+  color: var(--brand);
   margin-bottom: 6px;
 }
 
@@ -1431,7 +1431,7 @@ html.dark .desc-textarea {
 }
 
 html.dark .desc-textarea:focus {
-  border-color: #7b9eb8;
+  border-color: var(--brand);
   background: #1f1f33;
 }
 
@@ -1448,7 +1448,7 @@ html.dark .inline-progress-bar :deep(.el-progress-bar__outer) {
 }
 
 html.dark .inline-progress-bar :deep(.el-progress-bar__inner) {
-  background-color: #7b9eb8;
+  background-color: var(--brand);
 }
 
 html.dark .format-name {

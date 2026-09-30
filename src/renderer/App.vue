@@ -84,6 +84,7 @@ import { useDark, useToggle } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { fileInfoStore } from './stores/store'
 import { useLocaleStore } from './stores/localeStore'
+import { useSkinStore } from './stores/skinStore'
 import en from 'element-plus/es/locale/lang/en'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import 'element-plus/theme-chalk/dark/css-vars.css'
@@ -98,6 +99,16 @@ const { t } = useI18n()
 const isDark = useDark()
 const toggleDark = useToggle(isDark)
 const localeStore = useLocaleStore()
+const skinStore = useSkinStore()
+
+// 浅色皮肤同步到 html[data-skin]（tokens.css 据此覆盖品牌色；深色主题下无效果）
+watch(
+  () => skinStore.skin,
+  skin => {
+    document.documentElement.setAttribute('data-skin', skin)
+  },
+  { immediate: true }
+)
 
 const previewContainer = ref(null)
 provide('previewContainer', previewContainer)
@@ -220,13 +231,13 @@ html.dark .sidebar {
 }
 
 .sidebar-btn:hover {
-  background-color: #edf3f7;
-  color: #6d8da6;
+  background-color: var(--el-color-primary-light-9);
+  color: var(--brand-dark);
 }
 
 .sidebar-btn.active {
-  background-color: #dde8ef;
-  color: #6d8da6;
+  background-color: var(--el-color-primary-light-8);
+  color: var(--brand-dark);
 }
 
 .sidebar-btn.active::before {
@@ -237,7 +248,7 @@ html.dark .sidebar {
   transform: translateY(-50%);
   width: 3px;
   height: 20px;
-  background-color: #7b9eb8;
+  background-color: var(--brand);
   border-radius: 0 3px 3px 0;
 }
 

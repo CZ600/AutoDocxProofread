@@ -1588,7 +1588,7 @@ html.dark .preview-container.paper-dark-adapt a {
 }
 
 .recent-files-title-icon {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .recent-files-count {
@@ -1631,7 +1631,7 @@ html.dark .preview-container.paper-dark-adapt a {
 }
 
 .recent-files-item-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
   flex-shrink: 0;
 }
@@ -1711,7 +1711,7 @@ html.dark .recent-files-item-name {
 }
 
 html.dark .recent-files-item-icon {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 /* 最近文件卡片：暗色模式 */
@@ -1735,7 +1735,7 @@ html.dark .recent-card-name {
 }
 
 html.dark .recent-card-icon {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 html.dark .preview-container.paper-dark-adapt blockquote {
@@ -2370,7 +2370,7 @@ html.dark .win-btn:active {
 }
 
 .recent-card-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 18px;
   flex-shrink: 0;
   margin-top: 1px;

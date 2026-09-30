@@ -43,7 +43,7 @@ const modeLabel = computed(() =>
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 

@@ -46,7 +46,7 @@ const handleChange = (value: 'default' | 'enabled' | 'disabled') => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -63,7 +63,7 @@ const handleChange = (value: 'default' | 'enabled' | 'disabled') => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .thinking-row {

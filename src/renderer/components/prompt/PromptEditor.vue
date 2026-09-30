@@ -144,7 +144,7 @@ const handleReset = async () => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -202,10 +202,10 @@ const handleReset = async () => {
 }
 
 .radio-group :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
   color: #ffffff;
-  box-shadow: -1px 0 0 0 #7b9eb8;
+  box-shadow: -1px 0 0 0 var(--brand);
 }
 
 .radio-group :deep(.el-radio-button:first-child .el-radio-button__inner) {
@@ -213,7 +213,7 @@ const handleReset = async () => {
 }
 
 .radio-group :deep(.el-radio-button:first-child .el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  border-left-color: #7b9eb8;
+  border-left-color: var(--brand);
 }
 
 .custom-mode-row {
@@ -249,14 +249,14 @@ const handleReset = async () => {
 
 .btn-save {
   min-width: 140px;
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
   color: #ffffff;
 }
 
 .btn-save:hover {
-  background-color: #6d8da6;
-  border-color: #6d8da6;
+  background-color: var(--brand-dark);
+  border-color: var(--brand-dark);
 }
 
 .btn-subtle {

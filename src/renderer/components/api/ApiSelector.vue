@@ -141,7 +141,7 @@ const handleTest = async () => {
 }
 
 .section-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
   font-size: 16px;
 }
 
@@ -154,7 +154,7 @@ const handleTest = async () => {
 }
 
 .tooltip-icon:hover {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .form-item-enhanced {
@@ -215,13 +215,13 @@ const handleTest = async () => {
 .btn-add {
   flex: 1;
   min-width: 140px;
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
 }
 
 .btn-add:hover {
-  background-color: #6d8da6;
-  border-color: #6d8da6;
+  background-color: var(--brand-dark);
+  border-color: var(--brand-dark);
 }
 
 .btn-test {

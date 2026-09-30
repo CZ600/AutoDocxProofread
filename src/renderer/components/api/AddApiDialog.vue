@@ -313,7 +313,7 @@ const handleTest = async () => {
 }
 
 .dialog-header .el-icon {
-  color: #7b9eb8;
+  color: var(--brand);
 }
 
 .dialog-form {
@@ -345,13 +345,13 @@ const handleTest = async () => {
 }
 
 .btn-primary {
-  background-color: #7b9eb8;
-  border-color: #7b9eb8;
+  background-color: var(--brand);
+  border-color: var(--brand);
 }
 
 .btn-primary:hover {
-  background-color: #6d8da6;
-  border-color: #6d8da6;
+  background-color: var(--brand-dark);
+  border-color: var(--brand-dark);
 }
 </style>
 
