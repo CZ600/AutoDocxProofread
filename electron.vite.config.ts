@@ -10,12 +10,7 @@ export default defineConfig({
     build: {
       // main 入口：src/main/main.ts（electron-vite 默认找 src/main/index.ts，需显式指定）
       rollupOptions: {
-        input: resolve(__dirname, 'src/main/main.ts'),
-        external: [
-          // LanceDB 原生平台子包，必须保持从 node_modules 解析，不能打进 bundle
-          '@lancedb/lancedb',
-          '@lancedb/lancedb-win32-x64-msvc'
-        ]
+        input: resolve(__dirname, 'src/main/main.ts')
       }
     },
     resolve: {
@@ -28,11 +23,7 @@ export default defineConfig({
     build: {
       // preload 入口：src/main/preload.ts（项目放在 src/main/ 下而非默认的 src/preload/，需显式指定）
       rollupOptions: {
-        input: resolve(__dirname, 'src/main/preload.ts'),
-        external: [
-          '@lancedb/lancedb',
-          '@lancedb/lancedb-win32-x64-msvc'
-        ]
+        input: resolve(__dirname, 'src/main/preload.ts')
       }
     },
     plugins: [externalizeDepsPlugin()]

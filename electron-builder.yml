@@ -22,12 +22,6 @@ files:
   # source map 在生产环境无用，且常被杀软锁定导致复制失败，一律排除
   - '!**/*.map'
   - '!**/node_modules/**/{esbuild.exe,*.md,*.markdown,*.ts,*.flow,LICENSE*,*.coffee,*.tar.gz}'
-  # 方案D：排除源码零引用的运行时包（经 grep 核对 src/ 下无任何 import/require，
-  # 且经反向依赖分析确认无其它保留包依赖它们）。
-  # 注：这些包仍保留在 package.json（不影响 npm install），仅在打包阶段不进 asar。
-  - '!**/node_modules/{vue-markdown,marked,vue-demi,cli-progress,ora,bottleneck,file-saver,fast-xml-parser}/**'
-  # markdown 渲染链：vue-markdown 零引用，其传递依赖 markdown-it / highlight.js / katex / markdown-it-* 全链随之失效
-  - '!**/node_modules/{markdown-it,markdown-it-katex,markdown-it-abbr,markdown-it-deflist,markdown-it-emoji,markdown-it-footnote,markdown-it-ins,markdown-it-mark,markdown-it-sub,markdown-it-sup,markdown-it-task-lists,markdown-it-toc-and-anchor,katex,highlight.js}/**'
   # 方案C：排除 pdf-parse 的传递依赖 pdfjs-dist（~16MB）。
   # pdf-parse@2.x 的 dist/cjs/index.cjs 已用 webpack 把 pdfjs 完整内联打包，
   # 运行时不再 require 外层 pdfjs-dist（已实测：隐藏 pdfjs-dist 后仍能正常解析 PDF）。

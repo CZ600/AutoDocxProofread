@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { promisify } from 'util'
+import { promisify } from 'node:util'
 import { readFile } from 'node:fs/promises'
 import { insertDocument, getOrCreateTable, initLanceDB } from './lancedb'
 
