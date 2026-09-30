@@ -334,7 +334,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick, computed, provide, inject } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -361,13 +361,11 @@ import { useRecentFilesStore, formatRelativeTime } from '../stores/recentFilesSt
 import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download } from '@element-plus/icons-vue'
 import { useDark } from '@vueuse/core'
 import { requiresBaseURL } from '../../shared/modelProviders'
+import { applyCorrectionsToPreview, undoCorrectionsInPreview } from '../utils/correctionMatching'
 import {
-  applyCorrectionsToPreview,
-  clearHighlights,
-  getDomPositionFromIndex,
-  locateCorrectionsInPreview,
-  undoCorrectionsInPreview
-} from '../utils/correctionMatching'
+  applyAndHighlightCorrections,
+  highlightCorrections as rebuildPreviewHighlights
+} from '../utils/highlight'
 import { applyPreviewPerfHints } from '../utils/previewPerf'
 import { useWindowControls } from '../composables/useWindowControls'
 
@@ -425,7 +423,6 @@ let closeProgressTimer = null
 let proofreadProgressUnsubscribe = null
 let proofreadStreamUnsubscribe = null
 let cachedDocxFile = null
-let skipWatcherRerender = false
 
 // ---- 流式输出明细（整合进顶部进度条，与状态行滚动交替显示） ----
 const streamTotalChars = ref(0)
@@ -480,42 +477,13 @@ const repositoryStore = useRepositoryStore()
 const repositoryList = computed(() => repositoryStore.list)
 const selectRepository = ref([])
 
-const normalizeCorrectionType = type => {
-  return (type || '').toString().trim().toLowerCase()
-}
-
-// 文本定位/高亮/替换的通用逻辑统一在 utils/correctionMatching.js 维护，
-// 与 Proof.vue 左侧列表共用同一套匹配口径（含重复文本按出现次序分配的约定）
-
+// 文本定位/高亮/替换的通用逻辑统一在 utils/correctionMatching.js 与
+// utils/highlight.js 维护，与 Proof.vue 左侧列表共用同一套匹配口径
+// （含重复文本按出现次序分配的约定）；高亮点击 → 请求侧栏聚焦到对应项（反向跳转）
 const highlightCorrections = () => {
-  const container = previewContainer.value
-  if (!container) return
-  clearHighlights(container)
-  const pendingCorrections = proofreadingResults.value
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !item.applied && !item.rejected)
-  if (pendingCorrections.length === 0) return
-  const { matches, segments } = locateCorrectionsInPreview(container, pendingCorrections)
-  matches
-    .map(match => ({ ...match, segments }))
-    .sort((a, b) => b.start - a.start)
-    .forEach(match => {
-      const { segments: segs, start, end, item, index } = match
-      const startPos = getDomPositionFromIndex(segs, start, false)
-      const endPos = getDomPositionFromIndex(segs, end, true)
-      if (!startPos || !endPos) return
-      const range = document.createRange()
-      range.setStart(startPos.node, startPos.offset)
-      range.setEnd(endPos.node, endPos.offset)
-      const highlightEl = document.createElement('span')
-      const correctionTypeClass = `highlight-type-${normalizeCorrectionType(item.type)}`
-      highlightEl.className = `highlight-correction ${correctionTypeClass}`
-      highlightEl.dataset.correctionId = item.id || `correction-${index}`
-      // 点击预览高亮 → 请求左侧校对列表聚焦到对应项（反向跳转）
-      highlightEl.addEventListener('click', () => fileStore.requestSidebarFocus(index))
-      highlightEl.appendChild(range.extractContents())
-      range.insertNode(highlightEl)
-    })
+  rebuildPreviewHighlights(previewContainer.value, proofreadingResults.value, {
+    onHighlightClick: index => fileStore.requestSidebarFocus(index)
+  })
 }
 
 const formatCorrectionType = type => {
@@ -566,12 +534,22 @@ const applyByCategory = type => {
     ElMessage.warning(t('proof.messages.noPendingInCategory'))
     return
   }
-  skipWatcherRerender = true
-  // 在改动 store 前先取出目标项及其在结果列表中的下标，
-  // 供 applyCorrectionsToPreview 按"结果顺序=文档顺序"分配重复文本的出现位置
+  // 在改动 store 前先取出目标项及其在结果列表中的下标，供单趟定位按
+  // "结果顺序=文档顺序"分配重复文本的出现位置
   const targetList = proofreadingResults.value
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !item.applied && !item.rejected && item.type === type)
+  const pendingList = proofreadingResults.value
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => !item.applied && !item.rejected && item.type !== type)
+  // 单趟完成「替换目标类型 + 重高亮其余未处理」；预览 DOM 与高亮由本次调用
+  // 一次就位，置双豁免标记跳过两侧侦听的整篇重渲染/整列表重高亮
+  const container = previewContainer.value
+  const { replacedCount } = container
+    ? applyAndHighlightCorrections(container, targetList, pendingList, index => fileStore.requestSidebarFocus(index))
+    : { replacedCount: 0 }
+  fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = proofreadingResults.value.map(item => {
     if (!item.applied && item.type === type) {
       return { ...item, applied: true }
@@ -579,11 +557,6 @@ const applyByCategory = type => {
     return item
   })
   proofreadingResults.value = newResults
-  skipWatcherRerender = false
-  const container = previewContainer.value
-  if (!container) return
-  const replacedCount = applyCorrectionsToPreview(container, targetList)
-  highlightCorrections()
   const typeLabel = formatCorrectionType(type)
   if (replacedCount === applicableResults.length) {
     ElMessage.success(t('proof.messages.appliedAllOfType', { typeLabel }))
@@ -600,16 +573,18 @@ const applyALLCorrection = () => {
     ElMessage.warning(t('proof.messages.noPendingChanges'))
     return
   }
-  skipWatcherRerender = true
   const targetList = proofreadingResults.value
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => !item.applied && !item.rejected)
+  // 全部应用后没有剩余未处理项，无高亮需要重建，单趟定位替换即可
+  const container = previewContainer.value
+  const { replacedCount } = container
+    ? applyAndHighlightCorrections(container, targetList, [])
+    : { replacedCount: 0 }
+  fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = proofreadingResults.value.map(item => ({ ...item, applied: true }))
   proofreadingResults.value = newResults
-  skipWatcherRerender = false
-  const container = previewContainer.value
-  if (!container) return
-  const replacedCount = applyCorrectionsToPreview(container, targetList)
   if (replacedCount === targetList.length) {
     ElMessage.success(t('proof.messages.appliedAll'))
   } else {
@@ -669,7 +644,10 @@ const undoByCategory = async type => {
   const container = previewContainer.value
   const appliedItems = proofreadingResults.value.filter(item => item.applied)
   const undone = container ? undoCorrectionsInPreview(container, appliedItems, appliedResults) : 0
+  // DOM 重建方已确定（原位 + 手动重高亮 / 下方整篇重渲染兜底），
+  // 双豁免让两侧 results 侦听不重复重建
   fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = proofreadingResults.value.map(item => {
     if (item.applied && item.type === type) {
       return { ...item, applied: false }
@@ -696,7 +674,10 @@ const undoAllCorrections = async () => {
   const container = previewContainer.value
   const appliedItems = proofreadingResults.value.filter(item => item.applied)
   const undone = container ? undoCorrectionsInPreview(container, appliedItems, appliedResults) : 0
+  // DOM 重建方已确定（原位 + 手动重高亮 / 下方整篇重渲染兜底），
+  // 双豁免让两侧 results 侦听不重复重建
   fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = proofreadingResults.value.map(item => ({ ...item, applied: false }))
   proofreadingResults.value = newResults
   if (undone !== appliedResults.length) {
@@ -1042,18 +1023,8 @@ const loadFile = async (
     fileStore.setFileName(name)
     form.value.filePath = filePath
     const fileData = await electronAPI.readDocxFile(filePath)
-    const byteCharacters = atob(fileData.content)
-    const byteArrays = []
-    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-      const slice = byteCharacters.slice(offset, offset + 512)
-      const byteNumbers = new Array(slice.length)
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i)
-      }
-      const byteArray = new Uint8Array(byteNumbers)
-      byteArrays.push(byteArray)
-    }
-    const blob = new Blob(byteArrays, {
+    // IPC 结构化克隆直传字节数组：免去 base64 编码（+33% 体积）与渲染层逐字节解码
+    const blob = new Blob([fileData.buffer], {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     })
     const file = new File([blob], name, {
@@ -1432,8 +1403,8 @@ const initProofreadProgressListener = () => {
 watch(
   () => fileStore.results,
   async newResults => {
-    if (skipWatcherRerender) return
-    // 撤销等操作已在预览中原位完成文本回退，标记为无需整篇重渲染
+    // 应用/忽略/编辑/撤销等原位操作已在改动前自行维护好预览 DOM，
+    // 消费一次性豁免标记跳过整篇重渲染
     if (fileStore.consumeSkipResultRerender()) return
     if (newResults.length > 0) {
       // 重新渲染文档再高亮，与重启时 onMounted 行为一致。

@@ -129,13 +129,12 @@ import { Check, EditPen } from '@element-plus/icons-vue'
 
 import { scrollTo } from 'vue-scrollto'
 import { fileInfoStore } from '../stores/store'
+import { undoCorrectionsInPreview } from '../utils/correctionMatching'
 import {
-  clearHighlights,
-  getDomPositionFromIndex,
-  locateCorrectionsInPreview,
-  replaceCorrectionInPreview,
-  undoCorrectionsInPreview
-} from '../utils/correctionMatching'
+  applyAndHighlightCorrections,
+  highlightCorrections as rebuildPreviewHighlights,
+  unwrapHighlight
+} from '../utils/highlight'
 import { forceVisibleSection } from '../utils/previewPerf'
 
 const previewContainer = inject('previewContainer')
@@ -178,6 +177,10 @@ const saveEdit = index => {
     cancelEdit()
     return
   }
+  // 编辑只改侧栏展示的建议文本；未应用建议的原文在预览中原样存在，预览 DOM
+  // 无需任何改动，双豁免跳过整篇重渲染与整列表重高亮（编辑入口已挡掉已应用项）
+  fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], suggested: text, edited: true }
   proofreadingResults.value = newResults
@@ -187,6 +190,17 @@ const saveEdit = index => {
 
 // ---- 忽略 / 恢复 ----
 const ignoreCorrection = index => {
+  const item = proofreadingResults.value[index]
+  if (!item) return
+  // 原位移除对应高亮：按 data-correction-id 精确查找、不做文本定位，
+  // 脚注等复杂段落同样安全；移除失败（该条本就未定位到高亮）则不豁免，
+  // 由侦听方整篇重渲染兜底
+  const container = previewContainer.value
+  const removed = container ? unwrapHighlight(container, item.id || `correction-${index}`) : false
+  if (removed) {
+    fileStore.requestSkipResultRerender()
+    fileStore.requestSkipResultRehighlight()
+  }
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], rejected: true, applied: false }
   proofreadingResults.value = newResults
@@ -195,9 +209,17 @@ const ignoreCorrection = index => {
 }
 
 const unignoreCorrection = index => {
+  const item = proofreadingResults.value[index]
+  if (!item) return
+  // 恢复后该条要重新参与高亮，必须用改动后的 results 重建（本条要算进
+  // 未处理列表参与出现次序分配）：豁免两侧侦听后手动重建一次高亮，
+  // 只重建高亮、不重渲染文档
+  fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], rejected: false }
   proofreadingResults.value = newResults
+  highlightCorrections()
   ElMessage.success(t('proof.messages.unignored'))
 }
 
@@ -215,12 +237,13 @@ const formatCorrectionType = type => {
   return typeMap[type] || type
 }
 
-const normalizeCorrectionType = type => {
-  return (type || '').toString().trim().toLowerCase()
+// 高亮重建收敛到 utils/highlight.js（与右侧预览共用同一实现）；
+// 本列表的高亮点击回到侧栏聚焦
+const highlightCorrections = () => {
+  rebuildPreviewHighlights(previewContainer.value, proofreadingResults.value, {
+    onHighlightClick: scrollToCorrectionItem
+  })
 }
-
-// 文本定位/高亮/替换的通用逻辑统一在 utils/correctionMatching.js 维护，
-// 与右侧预览（DocPreview）共用同一套匹配口径（含重复文本按出现次序分配的约定）
 
 const scrollToCorrectionItem = index => {
   if (index === -1) return
@@ -301,57 +324,33 @@ const scrollPreviewToCorrection = index => {
   return true
 }
 
-const wrapPreviewRange = (container, match) => {
-  const { segments, start, end, item, index } = match
-  const startPos = getDomPositionFromIndex(segments, start, false)
-  const endPos = getDomPositionFromIndex(segments, end, true)
-  if (!startPos || !endPos) return false
-  const range = document.createRange()
-  range.setStart(startPos.node, startPos.offset)
-  range.setEnd(endPos.node, endPos.offset)
-  const highlightEl = document.createElement('span')
-  const correctionTypeClass = `highlight-type-${normalizeCorrectionType(item.type)}`
-  highlightEl.className = `highlight-correction ${correctionTypeClass}`
-  highlightEl.dataset.correctionId = item.id || `correction-${index}`
-  highlightEl.addEventListener('click', () => scrollToCorrectionItem(index))
-  highlightEl.appendChild(range.extractContents())
-  range.insertNode(highlightEl)
-  return true
-}
-
-const highlightCorrections = () => {
-  const container = previewContainer.value
-  if (!container) return
-  clearHighlights(container)
-  const pendingCorrections = proofreadingResults.value
-    .map((item, index) => ({ item, index }))
-    .filter(({ item }) => !item.applied && !item.rejected)
-  if (pendingCorrections.length === 0) return
-  const { matches, segments } = locateCorrectionsInPreview(container, pendingCorrections)
-  matches
-    .map(match => ({ ...match, segments }))
-    .sort((a, b) => b.start - a.start)
-    .forEach(match => {
-      wrapPreviewRange(container, match)
-    })
-}
-
 const applyCorrection = index => {
+  const target = proofreadingResults.value[index]
+  if (!target) return
+  // 单趟完成「替换本条 + 重高亮其余未处理」：定位时把全部未处理项与本条
+  // 一并纳入分配，重复文本按出现次序命中本条对应的位置（与高亮分配一致），
+  // 而不是总替换第一处；相比旧流程省去替换后重高亮的第二次全文定位
+  const container = previewContainer.value
+  const targetList = [{ item: target, index }]
+  const pendingList = proofreadingResults.value
+    .map((item, i) => ({ item, index: i }))
+    .filter(({ item, index: i }) => !item.applied && !item.rejected && i !== index)
+  const { targetReplaced } = container
+    ? applyAndHighlightCorrections(container, targetList, pendingList, scrollToCorrectionItem)
+    : { targetReplaced: new Set() }
+  const updated = targetReplaced.has(target)
+  if (updated) {
+    // 原位替换成功：预览 DOM 与高亮均已就位，豁免两侧侦听的整篇重建
+    fileStore.requestSkipResultRerender()
+    fileStore.requestSkipResultRehighlight()
+  }
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], applied: true }
   proofreadingResults.value = newResults
-  const container = previewContainer.value
-  if (!container) return
-  // 定位时把"全部未处理项 + 本条"一并纳入分配：重复文本按出现次序
-  // 命中本条对应的位置（与高亮分配一致），而不是总替换第一处
-  const contextList = newResults
-    .map((item, i) => ({ item, index: i }))
-    .filter(({ item, index: i }) => (!item.applied && !item.rejected) || i === index)
-  const updated = replaceCorrectionInPreview(container, newResults[index], contextList)
-  highlightCorrections()
   if (updated) {
     ElMessage.success(t('proof.messages.applied'))
   } else {
+    // 原位未命中：不豁免，由预览侧侦听整篇重渲染重放已应用项兜底
     ElMessage.warning(t('proof.messages.notLocatedInPreview'))
   }
 }
@@ -364,7 +363,10 @@ const undoCorrection = index => {
   const appliedItems = proofreadingResults.value.filter(item => item.applied)
   const undone =
     container && appliedItems.length > 0 ? undoCorrectionsInPreview(container, appliedItems, [target]) : 0
+  // 两种路径都已安排好 DOM 重建方（原位 + 手动重高亮 / rerenderVersion 整篇重建），
+  // 豁免两侧 results 侦听避免二次重建
   fileStore.requestSkipResultRerender()
+  fileStore.requestSkipResultRehighlight()
   const newResults = [...proofreadingResults.value]
   newResults[index] = { ...newResults[index], applied: false }
   proofreadingResults.value = newResults
@@ -383,6 +385,9 @@ const undoCorrection = index => {
 watch(
   () => fileStore.results,
   (newVal, oldVal) => {
+    // 应用/忽略/编辑/撤销等原位操作已在改动前自行维护好预览 DOM 与高亮，
+    // 消费一次性豁免标记，跳过整列表重建
+    if (fileStore.consumeSkipResultRehighlight()) return
     if (newVal.length > 0) {
       nextTick(() => highlightCorrections())
       // 仅在结果从无到有时自动展开第一项，避免应用/编辑等操作打乱当前展开状态

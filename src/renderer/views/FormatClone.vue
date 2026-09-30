@@ -652,17 +652,8 @@ const buildSpecFromFormatItems = () => {
 
 const renderPreview = async (filePath) => {
   const fileData = await electronAPI.readDocxFile(filePath)
-  const byteCharacters = atob(fileData.content)
-  const byteArrays = []
-  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-    const slice = byteCharacters.slice(offset, offset + 512)
-    const byteNumbers = new Array(slice.length)
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i)
-    }
-    byteArrays.push(new Uint8Array(byteNumbers))
-  }
-  const blob = new Blob(byteArrays, {
+  // IPC 结构化克隆直传字节数组：免去 base64 编码（+33% 体积）与逐字节解码
+  const blob = new Blob([fileData.buffer], {
     type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   })
   const file = new File([blob], fileStore.fileName, {

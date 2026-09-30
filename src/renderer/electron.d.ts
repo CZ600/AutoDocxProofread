@@ -90,10 +90,10 @@ export default interface ElectronApi {
   test: string
   // 文档加载
   selectDocxFile: () => string
-  readDocxFile: (filePath: string) => {
+  readDocxFile: (filePath: string) => Promise<{
     path: string
-    content: string
-  }
+    buffer: Uint8Array
+  }>
   extractDocxText: (filePath: string) => Promise<{
     success: boolean
     text?: string

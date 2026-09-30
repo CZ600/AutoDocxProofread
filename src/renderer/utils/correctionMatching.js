@@ -156,10 +156,12 @@ export const rangesOverlap = (left, right) => !(left.end <= right.start || left.
  * 在预览 DOM 中定位一组校正（先到先得占用，不重叠）。
  * @param {Element} container 预览容器
  * @param {Array<{item: object, index: number}>} corrections 校正与它在结果列表中的下标
+ * @param {{fullText: string, segments: Array}} [textNodeMap] 复用调用方已构建的全文映射，
+ *   避免同一次操作内重复对全文 buildTextNodeMap；不传则自行构建
  * @returns {{matches: Array<{item, index, start, end}>, segments}} segments 供调用方换算 DOM 位置
  */
-export const locateCorrectionsInPreview = (container, corrections) => {
-  const { fullText, segments } = buildTextNodeMap(container)
+export const locateCorrectionsInPreview = (container, corrections, textNodeMap) => {
+  const { fullText, segments } = textNodeMap || buildTextNodeMap(container)
   const occupiedRanges = []
   const matches = []
   corrections.forEach(({ item, index }) => {
@@ -206,26 +208,6 @@ export const replaceRangeWithSuggested = (container, segments, match) => {
   // suggested 中的 [[FOOTNOTE_REF:x]] / [[MATH:...]] 在 DOM 中不存在，需要 strip
   range.insertNode(document.createTextNode(stripFootnotePlaceholders(match.item.suggested || '')))
   return true
-}
-
-/**
- * 在预览中替换单条校正。
- * @param {Element} container 预览容器
- * @param {object} correction 待替换的校正对象（须与 contextList 中的引用一致）
- * @param {Array<{item: object, index: number}>} [contextList] 参与定位分配的完整上下文
- *   （通常为"全部未处理项 + 本条"）。传入后重复文本按出现次序命中本条对应的位置，
- *   而不是总替换第一处；省略时等价于只有本条参与分配（旧行为）。
- * @returns {boolean} 是否替换成功
- */
-export const replaceCorrectionInPreview = (container, correction, contextList) => {
-  clearHighlights(container)
-  const list = contextList && contextList.length > 0 ? contextList : [{ item: correction, index: 0 }]
-  const { matches, segments } = locateCorrectionsInPreview(container, list)
-  const match = matches.find(m => m.item === correction) || (list.length === 1 ? matches[0] : null)
-  if (!match) return false
-  const replaced = replaceRangeWithSuggested(container, segments, match)
-  if (replaced) container.normalize()
-  return replaced
 }
 
 /**

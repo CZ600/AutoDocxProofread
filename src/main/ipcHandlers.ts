@@ -180,9 +180,11 @@ export const registerIpcHandlers = () => {
   ipcMain.handle('read-docx-file', async (event, filePath) => {
     try {
       const data = await fs.promises.readFile(filePath)
+      // 结构化克隆直传字节数组：避免 base64 编码带来的 +33% 体积
+      // 与渲染层逐字节解码开销（20MB 级文档提升明显）
       return {
         path: filePath,
-        content: data.toString('base64')
+        buffer: data
       }
     } catch (error) {
       console.error('cannot read file:', error)
