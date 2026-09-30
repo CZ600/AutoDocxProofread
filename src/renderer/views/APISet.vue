@@ -21,26 +21,24 @@
 
           <div class="setting-group">
             <div class="setting-group-title">{{ t('apiSettings.groupRuntime') }}</div>
-            <!-- 两列网格：小控件卡片成对排列，避免单列长滚动；窄窗口自动回落单列 -->
-            <div class="setting-grid">
-              <TokenStatistics />
-              <ConcurrencySettings />
-              <RateLimitSettings />
-              <ThinkingSettings />
-              <ProxySettings />
-              <div class="setting-section setting-section--lang">
-                <div class="section-header">
-                  <el-icon><Connection /></el-icon>
-                  <span>{{ t('apiSettings.languageLabel') }}</span>
-                </div>
-                <div class="lang-row">
-                  <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
-                  <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
-                    <el-option label="简体中文" value="zh-CN" />
-                    <el-option label="English" value="en" />
-                  </el-select>
-                </div>
-              </div>
+            <TokenStatistics />
+            <ConcurrencySettings />
+            <RateLimitSettings />
+            <ThinkingSettings />
+            <ProxySettings />
+          </div>
+
+          <div class="setting-section">
+            <div class="section-header">
+              <el-icon><Connection /></el-icon>
+              <span>{{ t('apiSettings.languageLabel') }}</span>
+            </div>
+            <div class="lang-row">
+              <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
+              <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
+                <el-option label="简体中文" value="zh-CN" />
+                <el-option label="English" value="en" />
+              </el-select>
             </div>
           </div>
         </div>
@@ -325,29 +323,6 @@ onMounted(async () => {
   margin-bottom: 0;
 }
 
-/* 两列网格：每行卡片等高对齐，窄窗口回落单列 */
-.setting-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  align-items: stretch;
-}
-
-.setting-grid > :deep(.setting-section) {
-  margin: 0;
-  height: 100%;
-}
-
-@media (max-width: 1100px) {
-  .setting-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .setting-grid > :deep(.setting-section) {
-    height: auto;
-  }
-}
-
 /* 分组小标题：提供层次感 */
 .setting-group-title {
   margin-top: 12px;
@@ -360,10 +335,15 @@ onMounted(async () => {
   text-transform: uppercase;
 }
 
-/* 统一所有子卡片的边距节奏（网格内的卡片由 .setting-grid 归零外边距） */
+/* 统一所有子卡片的边距节奏 */
 .tab-content > :deep(.setting-section) {
   margin-bottom: 12px;
   padding: 16px 18px;
+}
+
+.tab-content > :deep(.setting-section:last-child),
+.setting-group > :deep(.setting-section:last-child) {
+  margin-bottom: 0;
 }
 
 .fade-slide {
