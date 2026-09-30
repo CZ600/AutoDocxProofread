@@ -1,0 +1,95 @@
+/**
+ * 文档预览的全局样式（批次 9 自 DocPreview.vue 迁出）：
+ * 顶栏暗色点缀、预览容器暗色边框、docx 灰底去除与「纸面适配暗色」门控规则。
+ * 预览 DOM 由 docx-preview 动态生成，无法使用 scoped；选择器限定 .preview-container 下。
+ */
+
+/* 顶栏分隔线 / 下拉框 hover：暗色适配 */
+html.dark .bar-select .el-select__wrapper:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+html.dark .file-name-tag {
+  background-color: #1a2740;
+  color: #8ec5ff;
+}
+
+html.dark .preview-container {
+  border-color: var(--border-color);
+}
+
+/* 暗色下去掉 docx-preview 默认灰底与页边距，让面板底色透出；
+   纸面颜色由下方 paper-dark-adapt 门控，默认保持文档白底黑字 */
+html.dark .preview-container .docx-wrapper {
+  background: transparent;
+  padding: 0;
+}
+
+/* ---- 暗色纸面适配（仅「纸面适配暗色」开启时生效） ---- */
+html.dark .preview-container.paper-dark-adapt section.docx {
+  background-color: var(--bg-panel);
+}
+
+html.dark .preview-container.paper-dark-adapt p,
+html.dark .preview-container.paper-dark-adapt span,
+html.dark .preview-container.paper-dark-adapt div,
+html.dark .preview-container.paper-dark-adapt li,
+html.dark .preview-container.paper-dark-adapt td,
+html.dark .preview-container.paper-dark-adapt th {
+  color: #e4e7ed !important;
+}
+
+html.dark .preview-container.paper-dark-adapt h1,
+html.dark .preview-container.paper-dark-adapt h2,
+html.dark .preview-container.paper-dark-adapt h3,
+html.dark .preview-container.paper-dark-adapt h4,
+html.dark .preview-container.paper-dark-adapt h5,
+html.dark .preview-container.paper-dark-adapt h6 {
+  color: #f2f3f5 !important;
+}
+
+html.dark .preview-container.paper-dark-adapt table {
+  background-color: var(--bg-panel) !important;
+}
+
+html.dark .preview-container.paper-dark-adapt td,
+html.dark .preview-container.paper-dark-adapt th {
+  border-color: var(--border-color) !important;
+  background-color: transparent !important;
+}
+
+html.dark .preview-container.paper-dark-adapt tr {
+  background-color: transparent !important;
+}
+
+html.dark .preview-container.paper-dark-adapt ul,
+html.dark .preview-container.paper-dark-adapt ol {
+  color: #e4e7ed;
+}
+
+html.dark .preview-container.paper-dark-adapt pre,
+html.dark .preview-container.paper-dark-adapt code {
+  background-color: var(--bg-sunken) !important;
+  color: #e4e7ed !important;
+}
+
+html.dark .preview-container.paper-dark-adapt a {
+  color: #75c777 !important;
+}
+
+/* ---- 最近文件下拉/卡片样式已随 RecentFiles.vue 与 RecentFileCards.vue 迁出（批次 9） ---- */
+
+html.dark .preview-container.paper-dark-adapt blockquote {
+  border-left-color: var(--border-strong) !important;
+  background-color: var(--bg-sunken) !important;
+  color: #e4e7ed !important;
+}
+
+html.dark .preview-container.paper-dark-adapt img {
+  filter: brightness(0.9) contrast(1.1);
+}
+
+html.dark .preview-container.paper-dark-adapt hr {
+  border-color: var(--border-color) !important;
+}
+

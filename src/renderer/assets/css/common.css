@@ -43,6 +43,42 @@ html.dark ::-webkit-scrollbar-track {
   background-color: transparent;
 }
 
+/* ---- 顶栏无边框紧凑按钮（批次 9 自 DocPreview.vue 收敛）：
+   图标+文字，hover 以浅底反馈替代描边；DocPreview 工具栏与 RecentFiles 共用 ---- */
+.bar-btn {
+  height: 30px;
+  padding: 0 8px;
+  margin-left: 0 !important;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bar-btn .el-icon {
+  font-size: 15px;
+}
+
+/* ---- 「选择文件」分体按钮：主按钮 + 箭头触发器（RecentFiles.vue）---- */
+.select-file-split {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.select-file-split .el-button:first-child {
+  padding-right: 4px;
+}
+
+.select-file-split-trigger {
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.select-file-split-trigger .el-icon {
+  font-size: 14px;
+}
+
 /* ---- 设置区公共版式（批次 9 自九个组件的 scoped 逐字拷贝收敛）----
    亮色基类唯一定义于此，暗色适配见上方 html.dark 块；组件内仅保留与基类的
    差异项（如 RateLimitSettings 的 margin-bottom: 0、APISet 的 margin-top）。 */
