@@ -160,7 +160,9 @@ getEnv()
 
 .sidebar {
   width: 52px;
-  background-color: #2c3a48;
+  background-color: #ffffff;
+  /* 与内容区的分隔线用内阴影绘制，避免边框撑宽 52px 定宽布局（action-bar fixed left:52px 依赖） */
+  box-shadow: inset -1px 0 0 #edf0f4;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -170,8 +172,10 @@ getEnv()
   -webkit-app-region: drag;
 }
 
-.sidebar.dark {
-  background-color: #181825;
+/* 深色模式：跟随顶栏/预览面板的深色底（dark 类挂在 .app-layout 上） */
+.dark .sidebar {
+  background-color: #1d1e1f;
+  box-shadow: inset -1px 0 0 #2c2e30;
 }
 
 .sidebar-top {
@@ -207,7 +211,7 @@ getEnv()
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: #8fa3b4;
+  color: #909399;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,13 +223,13 @@ getEnv()
 }
 
 .sidebar-btn:hover {
-  background-color: rgba(123, 158, 184, 0.18);
-  color: #a0bdd0;
+  background-color: #edf3f7;
+  color: #6d8da6;
 }
 
 .sidebar-btn.active {
-  background-color: rgba(123, 158, 184, 0.22);
-  color: #a0bdd0;
+  background-color: #dde8ef;
+  color: #6d8da6;
 }
 
 .sidebar-btn.active::before {
@@ -238,6 +242,21 @@ getEnv()
   height: 20px;
   background-color: #7b9eb8;
   border-radius: 0 3px 3px 0;
+}
+
+/* 深色模式下恢复深底按钮配色 */
+.dark .sidebar-btn {
+  color: #8fa3b4;
+}
+
+.dark .sidebar-btn:hover {
+  background-color: rgba(123, 158, 184, 0.18);
+  color: #a0bdd0;
+}
+
+.dark .sidebar-btn.active {
+  background-color: rgba(123, 158, 184, 0.22);
+  color: #a0bdd0;
 }
 
 .theme-btn {
