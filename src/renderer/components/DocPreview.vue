@@ -164,6 +164,19 @@
             <span>{{ activeMode === 'format-clone' ? t('proof.formatClone.backToProof') : t('proof.formatClone.title') }}</span>
           </el-button>
 
+          <!-- 暗色纸面适配开关：仅暗色主题显示；默认关闭保持文档原有白底黑字 -->
+          <el-tooltip
+            v-if="isDark"
+            :content="t('proof.previewDarkAdaptTip')"
+            placement="bottom"
+            popper-class="settings-hint-popper"
+          >
+            <el-button text size="default" class="bar-btn" :type="paperDarkAdapt ? 'primary' : 'default'" @click="togglePaperDarkAdapt">
+              <el-icon><View /></el-icon>
+              <span>{{ t('proof.previewDarkAdapt') }}</span>
+            </el-button>
+          </el-tooltip>
+
           <template v-if="activeMode !== 'format-clone'">
             <span class="toolbar-divider" />
 
@@ -303,7 +316,7 @@
     </div>
 
     <div class="preview-area">
-      <div ref="previewContainer" class="preview-container">
+      <div ref="previewContainer" class="preview-container" :class="{ 'paper-dark-adapt': paperDarkAdapt }">
         <div v-if="!fileName" class="preview-empty-wrap">
           <el-empty :description="t('proof.previewFile')" :image-size="80" />
           <div v-if="!recentFilesStore.isEmpty" class="recent-cards">
@@ -358,7 +371,7 @@ import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useRepositoryStore } from '../stores/repositoryStore'
 import { useApiStore } from '../stores/apiStore'
 import { useRecentFilesStore, formatRelativeTime } from '../stores/recentFilesStore'
-import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download } from '@element-plus/icons-vue'
+import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download, View } from '@element-plus/icons-vue'
 import { useDark } from '@vueuse/core'
 import { requiresBaseURL } from '../../shared/modelProviders'
 import {
@@ -378,6 +391,13 @@ const electronAPI = window.electronAPI
 const router = useRouter()
 const { t } = useI18n()
 const isDark = useDark()
+
+// 暗色纸面适配：默认所见即所得（文档保持白底黑字），
+// 开启后（且处于暗色主题）文档纸面跟随渲染为深色
+const paperDarkAdapt = computed(() => isDark.value && fileStore.previewDarkAdapt)
+const togglePaperDarkAdapt = () => {
+  fileStore.setPreviewDarkAdapt(!fileStore.previewDarkAdapt)
+}
 
 const previewContainer = inject('previewContainer')
 const activeMode = inject('activeMode')
@@ -1487,16 +1507,7 @@ onUnmounted(() => {
 </script>
 
 <style>
-html.dark .action-bar {
-  background-color: #1d1e1f;
-  border-bottom-color: #2c2e30;
-}
-
 /* 顶栏分隔线 / 下拉框 hover：暗色适配 */
-html.dark .toolbar-divider {
-  background-color: #4c4d4f;
-}
-
 html.dark .bar-select .el-select__wrapper:hover {
   background-color: rgba(255, 255, 255, 0.08);
 }
@@ -1507,63 +1518,65 @@ html.dark .file-name-tag {
 }
 
 html.dark .preview-container {
-  background-color: #1d1e1f;
-  border-color: #2c2e30;
+  border-color: var(--border-color);
 }
 
-html.dark .preview-container section.docx {
-  background-color: #1d1e1f;
-}
-
+/* 暗色下去掉 docx-preview 默认灰底与页边距，让面板底色透出；
+   纸面颜色由下方 paper-dark-adapt 门控，默认保持文档白底黑字 */
 html.dark .preview-container .docx-wrapper {
-  background-color: #1d1e1f;
+  background: transparent;
   padding: 0;
 }
 
-html.dark .preview-container p,
-html.dark .preview-container span,
-html.dark .preview-container div,
-html.dark .preview-container li,
-html.dark .preview-container td,
-html.dark .preview-container th {
+/* ---- 暗色纸面适配（仅「纸面适配暗色」开启时生效） ---- */
+html.dark .preview-container.paper-dark-adapt section.docx {
+  background-color: var(--bg-panel);
+}
+
+html.dark .preview-container.paper-dark-adapt p,
+html.dark .preview-container.paper-dark-adapt span,
+html.dark .preview-container.paper-dark-adapt div,
+html.dark .preview-container.paper-dark-adapt li,
+html.dark .preview-container.paper-dark-adapt td,
+html.dark .preview-container.paper-dark-adapt th {
   color: #e4e7ed !important;
 }
 
-html.dark .preview-container h1,
-html.dark .preview-container h2,
-html.dark .preview-container h3,
-html.dark .preview-container h4,
-html.dark .preview-container h5,
-html.dark .preview-container h6 {
+html.dark .preview-container.paper-dark-adapt h1,
+html.dark .preview-container.paper-dark-adapt h2,
+html.dark .preview-container.paper-dark-adapt h3,
+html.dark .preview-container.paper-dark-adapt h4,
+html.dark .preview-container.paper-dark-adapt h5,
+html.dark .preview-container.paper-dark-adapt h6 {
   color: #f2f3f5 !important;
 }
 
-html.dark .preview-container table {
-  background-color: #1d1e1f !important;
+html.dark .preview-container.paper-dark-adapt table {
+  background-color: var(--bg-panel) !important;
 }
 
-html.dark .preview-container td,
-html.dark .preview-container th {
-  border-color: #2c2e30 !important;
+html.dark .preview-container.paper-dark-adapt td,
+html.dark .preview-container.paper-dark-adapt th {
+  border-color: var(--border-color) !important;
   background-color: transparent !important;
 }
 
-html.dark .preview-container tr {
+html.dark .preview-container.paper-dark-adapt tr {
   background-color: transparent !important;
 }
 
-html.dark .preview-container ul,
-html.dark .preview-container ol {
+html.dark .preview-container.paper-dark-adapt ul,
+html.dark .preview-container.paper-dark-adapt ol {
   color: #e4e7ed;
 }
 
-html.dark .preview-container pre,
-html.dark .preview-container code {
-  background-color: #141414 !important;
+html.dark .preview-container.paper-dark-adapt pre,
+html.dark .preview-container.paper-dark-adapt code {
+  background-color: var(--bg-sunken) !important;
   color: #e4e7ed !important;
 }
 
-html.dark .preview-container a {
+html.dark .preview-container.paper-dark-adapt a {
   color: #75c777 !important;
 }
 
@@ -1741,18 +1754,18 @@ html.dark .recent-card-icon {
   color: #7b9eb8;
 }
 
-html.dark .preview-container blockquote {
-  border-left-color: #4c4d4f !important;
-  background-color: #141414 !important;
+html.dark .preview-container.paper-dark-adapt blockquote {
+  border-left-color: var(--border-strong) !important;
+  background-color: var(--bg-sunken) !important;
   color: #e4e7ed !important;
 }
 
-html.dark .preview-container img {
+html.dark .preview-container.paper-dark-adapt img {
   filter: brightness(0.9) contrast(1.1);
 }
 
-html.dark .preview-container hr {
-  border-color: #2c2e30 !important;
+html.dark .preview-container.paper-dark-adapt hr {
+  border-color: var(--border-color) !important;
 }
 
 html.dark .inline-progress-line--thinking {
@@ -2077,13 +2090,14 @@ html.dark .kb-dropdown-list::-webkit-scrollbar-thumb {
 .action-bar {
   position: fixed;
   top: 0;
-  left: 52px;
+  /* 与 App 侧栏共用 --sidebar-width，避免两处魔法数字漂移 */
+  left: var(--sidebar-width);
   right: 0;
   height: 52px;
   padding: 0 20px;
-  padding-right: 158px; /* 右端留给自定义窗口控制按钮（3×46px + 间距） */
-  background-color: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  padding-right: var(--titlebar-reserve); /* 右端预留给自定义窗口控制按钮 */
+  background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
   z-index: 99;
   -webkit-app-region: drag;
 }
@@ -2208,7 +2222,7 @@ html.dark .win-btn:active {
   width: 1px;
   height: 18px;
   margin: 0 4px;
-  background-color: #dcdfe6;
+  background-color: var(--border-strong);
   flex-shrink: 0;
 }
 
@@ -2282,7 +2296,7 @@ html.dark .win-btn:active {
   overflow: auto;
   padding: 0px;
   margin: 0;
-  background-color: #fff;
+  background-color: var(--bg-panel);
   transition: box-shadow 0.2s ease;
 }
 

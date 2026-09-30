@@ -24,6 +24,8 @@
     "startProof": "Start Proofread",
     "proofreading": "Proofreading...",
     "exportResult": "Export Result",
+    "previewDarkAdapt": "Dark Paper",
+    "previewDarkAdaptTip": "When on, the document paper is also rendered in dark colors under the dark theme; when off, the document keeps its original white paper (WYSIWYG)",
     "selectKnowledge": "Select Knowledge Base",
     "kbSelectedCount": "{count} selected",
     "kbEmpty": "No knowledge bases",

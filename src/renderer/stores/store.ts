@@ -29,7 +29,9 @@ export const fileInfoStore = defineStore('fileInfo', {
     skipResultRerenderOnce: false,
     // 侧边栏聚焦信号：点击右侧预览高亮时，请求左侧校对列表滚动/展开到对应项
     sidebarFocusIndex: -1,
-    sidebarFocusVersion: 0
+    sidebarFocusVersion: 0,
+    // 暗色主题下文档预览纸面是否跟随变暗：默认 false 保持文档原有白底黑字（所见即所得）
+    previewDarkAdapt: false
   }),
 
   getters: {
@@ -73,6 +75,9 @@ export const fileInfoStore = defineStore('fileInfo', {
       this.sidebarFocusIndex = index
       this.sidebarFocusVersion++
     },
+    setPreviewDarkAdapt(value: boolean) {
+      this.previewDarkAdapt = value
+    },
     clearAll() {
       this.filePath = ''
       this.fileName = ''
@@ -88,6 +93,6 @@ export const fileInfoStore = defineStore('fileInfo', {
   persist: {
     key: 'fileInfo',
     storage: safeLocalStorage as unknown as Storage,
-    paths: ['filePath', 'fileName', 'proofModel', 'results']
+    paths: ['filePath', 'fileName', 'proofModel', 'results', 'previewDarkAdapt']
   }
 })

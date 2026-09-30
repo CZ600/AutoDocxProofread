@@ -24,6 +24,8 @@
     "startProof": "开始校正",
     "proofreading": "校对中...",
     "exportResult": "导出结果",
+    "previewDarkAdapt": "纸面适配暗色",
+    "previewDarkAdaptTip": "开启后，暗色主题下文档纸面也渲染为深色；关闭则保持文档原有白底黑字（所见即所得）",
     "selectKnowledge": "选择知识库",
     "kbSelectedCount": "已选 {count}",
     "kbEmpty": "暂无知识库",
