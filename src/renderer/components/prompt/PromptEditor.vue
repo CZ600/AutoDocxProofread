@@ -1,91 +1,100 @@
 <template>
-  <div class="setting-section">
-    <div class="section-header">
-      <el-icon><Setting /></el-icon>
-      <span>{{ t('promptEditor.title') }}</span>
+  <div class="prompt-settings">
+    <!-- 卡片一：校对参数（错误类型 / 强度 / 背景），选项变化实时反映到提示词预览 -->
+    <div class="setting-section">
+      <div class="section-header">
+        <el-icon><Setting /></el-icon>
+        <span>{{ t('promptEditor.title') }}</span>
+      </div>
+
+      <el-form label-position="top" class="prompt-form">
+        <el-form-item :label="t('promptEditor.errorTypes')" class="form-item">
+          <el-checkbox-group v-model="draftSettings.errorTypes" class="checkbox-group">
+            <el-checkbox v-for="item in errorTypeOptions" :key="item.value" :label="item.value">
+              {{ t('promptEditor.errorTypeOptions.' + item.value) }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </el-form-item>
+
+        <el-form-item :label="t('promptEditor.intensity')" class="form-item">
+          <el-radio-group v-model="draftSettings.intensity" class="radio-group">
+            <el-radio-button v-for="item in intensityOptions" :key="item.value" :label="item.value">
+              {{ t('promptEditor.intensityOptions.' + item.value) }}
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item :label="t('promptEditor.background')" class="form-item">
+          <el-radio-group v-model="draftSettings.background" class="radio-group">
+            <el-radio-button v-for="item in backgroundOptions" :key="item.value" :label="item.value">
+              {{ t('promptEditor.backgroundOptions.' + item.value) }}
+            </el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item
+          v-if="draftSettings.background === 'custom'"
+          :label="t('promptEditor.customBackgroundLabel')"
+          class="form-item form-item--last"
+        >
+          <el-input
+            v-model="draftSettings.customBackground"
+            type="textarea"
+            :rows="3"
+            :placeholder="t('promptEditor.customBackgroundPlaceholder')"
+          />
+        </el-form-item>
+      </el-form>
     </div>
 
-    <el-form label-position="top" class="prompt-form">
-      <el-form-item :label="t('promptEditor.errorTypes')" class="form-item">
-        <el-checkbox-group v-model="draftSettings.errorTypes" class="checkbox-group">
-          <el-checkbox v-for="item in errorTypeOptions" :key="item.value" :label="item.value">
-            {{ t('promptEditor.errorTypeOptions.' + item.value) }}
-          </el-checkbox>
-        </el-checkbox-group>
-      </el-form-item>
-
-      <el-form-item :label="t('promptEditor.intensity')" class="form-item">
-        <el-radio-group v-model="draftSettings.intensity" class="radio-group">
-          <el-radio-button v-for="item in intensityOptions" :key="item.value" :label="item.value">
-            {{ t('promptEditor.intensityOptions.' + item.value) }}
-          </el-radio-button>
-        </el-radio-group>
-      </el-form-item>
-
-      <el-form-item :label="t('promptEditor.background')" class="form-item">
-        <el-radio-group v-model="draftSettings.background" class="radio-group">
-          <el-radio-button v-for="item in backgroundOptions" :key="item.value" :label="item.value">
-            {{ t('promptEditor.backgroundOptions.' + item.value) }}
-          </el-radio-button>
-        </el-radio-group>
-      </el-form-item>
-
-      <el-form-item
-        v-if="draftSettings.background === 'custom'"
-        :label="t('promptEditor.customBackgroundLabel')"
-        class="form-item"
-      >
-        <el-input
-          v-model="draftSettings.customBackground"
-          type="textarea"
-          :rows="3"
-          :placeholder="t('promptEditor.customBackgroundPlaceholder')"
-        />
-      </el-form-item>
-
-      <el-divider>{{ t('promptEditor.customPromptDivider') }}</el-divider>
+    <!-- 卡片二：自定义提示词，开启后完全覆盖上方选项生成的提示词 -->
+    <div class="setting-section">
+      <div class="section-header">
+        <el-icon><EditPen /></el-icon>
+        <span>{{ t('promptEditor.customPromptDivider') }}</span>
+      </div>
 
       <div class="custom-mode-row">
-        <div>
-          <div class="custom-mode-title">{{ t('promptEditor.customModeTitle') }}</div>
-          <div class="custom-mode-desc">{{ t('promptEditor.customModeDesc') }}</div>
-        </div>
+        <div class="custom-mode-desc">{{ t('promptEditor.customModeDesc') }}</div>
         <el-switch v-model="draftSettings.customPromptEnabled" />
       </div>
 
-      <el-form-item
+      <el-form
         v-if="draftSettings.customPromptEnabled"
-        :label="t('promptEditor.customPromptLabel')"
-        class="form-item"
+        label-position="top"
+        class="prompt-form prompt-form--last"
       >
-        <el-input
-          v-model="draftSettings.customPrompt"
-          type="textarea"
-          :rows="7"
-          :placeholder="t('promptEditor.customPromptPlaceholder')"
-          class="prompt-textarea"
-        />
-      </el-form-item>
+        <el-form-item :label="t('promptEditor.customPromptLabel')" class="form-item">
+          <el-input
+            v-model="draftSettings.customPrompt"
+            type="textarea"
+            :rows="7"
+            :placeholder="t('promptEditor.customPromptPlaceholder')"
+            class="prompt-textarea"
+          />
+        </el-form-item>
+      </el-form>
+    </div>
 
-      <div class="button-group">
-        <el-button @click="handleSave" :icon="Select" class="btn-save">
-          {{ t('promptEditor.apply') }}
-        </el-button>
-        <el-button @click="resetDraft" :icon="RefreshLeft" class="btn-subtle">
-          {{ t('promptEditor.undo') }}
-        </el-button>
-        <el-button @click="handleReset" :icon="Warning" class="btn-subtle">
-          {{ t('promptEditor.resetDefault') }}
-        </el-button>
-      </div>
-    </el-form>
+    <!-- 操作条：两卡共享同一份草稿，统一应用/撤销/重置 -->
+    <div class="button-group">
+      <el-button @click="handleSave" :icon="Select" class="btn-save">
+        {{ t('promptEditor.apply') }}
+      </el-button>
+      <el-button @click="resetDraft" :icon="RefreshLeft" class="btn-subtle">
+        {{ t('promptEditor.undo') }}
+      </el-button>
+      <el-button @click="handleReset" :icon="Warning" class="btn-subtle">
+        {{ t('promptEditor.resetDefault') }}
+      </el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { RefreshLeft, Select, Setting, Warning } from '@element-plus/icons-vue'
+import { RefreshLeft, Select, Setting, EditPen, Warning } from '@element-plus/icons-vue'
 import { usePrompt } from '../../composables/usePrompt'
 import { clonePromptSettings } from '../../../shared/promptSettings'
 
@@ -143,8 +152,23 @@ const handleReset = async () => {
   padding: 4px 0;
 }
 
+/* 表单标签配色与 APISet 页统一 */
+.prompt-form :deep(.el-form-item__label) {
+  color: #5a6e80;
+  font-weight: 500;
+}
+
 .form-item {
   margin-bottom: 24px;
+}
+
+/* 卡片内最后一项去掉底部外边距，避免卡内多余空白 */
+.form-item--last {
+  margin-bottom: 0;
+}
+
+.prompt-form--last .form-item {
+  margin-bottom: 0;
 }
 
 .checkbox-group {
@@ -197,17 +221,11 @@ const handleReset = async () => {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding: 14px 16px;
   border-radius: 8px;
   background: #f4f6f9;
   border: none;
-}
-
-.custom-mode-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: #4a6580;
 }
 
 .custom-mode-desc {
@@ -220,10 +238,12 @@ const handleReset = async () => {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
+/* 操作条：右对齐贴卡片底部，与设置页「保存即所得」的动线一致 */
 .button-group {
   display: flex;
+  justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
+  margin-top: 0;
   flex-wrap: wrap;
 }
 
