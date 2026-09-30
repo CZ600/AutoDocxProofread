@@ -27,20 +27,6 @@
             <ThinkingSettings />
             <ProxySettings />
           </div>
-
-          <div class="setting-section">
-            <div class="section-header">
-              <el-icon><Connection /></el-icon>
-              <span>{{ t('apiSettings.languageLabel') }}</span>
-            </div>
-            <div class="lang-row">
-              <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
-              <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
-                <el-option label="简体中文" value="zh-CN" />
-                <el-option label="English" value="en" />
-              </el-select>
-            </div>
-          </div>
         </div>
       </el-tab-pane>
 
@@ -105,6 +91,39 @@
           </div>
         </div>
       </el-tab-pane>
+
+      <el-tab-pane :label="t('apiSettings.tabOther')" name="other">
+        <div class="tab-content">
+          <div class="setting-section">
+            <div class="section-header">
+              <el-icon><Connection /></el-icon>
+              <span>{{ t('apiSettings.languageLabel') }}</span>
+            </div>
+            <div class="lang-row">
+              <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
+              <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
+                <el-option label="简体中文" value="zh-CN" />
+                <el-option label="English" value="en" />
+              </el-select>
+            </div>
+          </div>
+
+          <div class="setting-section">
+            <div class="section-header">
+              <el-icon><View /></el-icon>
+              <span>{{ t('apiSettings.paperDarkAdaptTitle') }}</span>
+              <el-tooltip effect="dark" :content="t('apiSettings.paperDarkAdaptHint')" placement="top" popper-class="settings-hint-popper">
+                <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </div>
+            <div class="review-switch-row">
+              <el-switch v-model="paperDarkAdapt" />
+              <span class="review-switch-label">{{ t('apiSettings.paperDarkAdaptLabel') }}</span>
+              <span class="review-switch-hint">{{ t('apiSettings.paperDarkAdaptHint') }}</span>
+            </div>
+          </div>
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -113,7 +132,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { CircleCheck, Cpu, Select, Delete, Connection, QuestionFilled } from '@element-plus/icons-vue'
+import { CircleCheck, Cpu, Select, Delete, Connection, QuestionFilled, View } from '@element-plus/icons-vue'
 import ApiSelector from '../components/api/ApiSelector.vue'
 import AddApiDialog from '../components/api/AddApiDialog.vue'
 import TokenStatistics from '../components/api/TokenStatistics.vue'
@@ -125,6 +144,7 @@ import PromptSettingsPanel from '../components/prompt/PromptSettingsPanel.vue'
 import { useApiSettings, type ApiFormData } from '../composables/useApiSettings'
 import { useApiStore } from '../stores/apiStore'
 import { useLocaleStore } from '../stores/localeStore'
+import { fileInfoStore } from '../stores/store'
 
 const { t } = useI18n()
 const localeStore = useLocaleStore()
@@ -189,6 +209,13 @@ const handleToggleReview = (value: boolean | string | number) => {
     value === true ? t('apiSettings.reviewEnabledToast') : t('apiSettings.reviewDisabledToast')
   )
 }
+
+// 预览纸面适配暗色（默认开启）：暗色主题下文档预览跟随变暗，关闭则保持白底所见即所得
+const fileStore = fileInfoStore()
+const paperDarkAdapt = computed({
+  get: () => fileStore.previewDarkAdapt,
+  set: (value: boolean) => fileStore.setPreviewDarkAdapt(value)
+})
 
 onMounted(async () => {
   await initApiSettings()

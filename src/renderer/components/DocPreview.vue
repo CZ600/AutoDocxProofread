@@ -164,19 +164,6 @@
             <span>{{ activeMode === 'format-clone' ? t('proof.formatClone.backToProof') : t('proof.formatClone.title') }}</span>
           </el-button>
 
-          <!-- 暗色纸面适配开关：仅暗色主题显示；默认开启跟随主题，关闭保持文档白底（所见即所得） -->
-          <el-tooltip
-            v-if="isDark"
-            :content="t('proof.previewDarkAdaptTip')"
-            placement="bottom"
-            popper-class="settings-hint-popper"
-          >
-            <el-button text size="default" class="bar-btn" :type="paperDarkAdapt ? 'primary' : 'default'" @click="togglePaperDarkAdapt">
-              <el-icon><View /></el-icon>
-              <span>{{ t('proof.previewDarkAdapt') }}</span>
-            </el-button>
-          </el-tooltip>
-
           <template v-if="activeMode !== 'format-clone'">
             <span class="toolbar-divider" />
 
@@ -371,7 +358,7 @@ import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useRepositoryStore } from '../stores/repositoryStore'
 import { useApiStore } from '../stores/apiStore'
 import { useRecentFilesStore, formatRelativeTime } from '../stores/recentFilesStore'
-import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download, View } from '@element-plus/icons-vue'
+import { Collection, Document, ArrowDown, Select, RefreshLeft, Folder, Clock, Close, Files, FolderOpened, CopyDocument, VideoPlay, Download } from '@element-plus/icons-vue'
 import { useDark } from '@vueuse/core'
 import { requiresBaseURL } from '../../shared/modelProviders'
 import {
@@ -393,11 +380,8 @@ const { t } = useI18n()
 const isDark = useDark()
 
 // 暗色纸面适配：默认跟随主题（暗色下文档从白底黑字切为黑底白字，与历史行为一致），
-// 关闭后文档保持原有白底（所见即所得）
+// 关闭后文档保持原有白底（所见即所得）。开关入口在设置页「其他」tab。
 const paperDarkAdapt = computed(() => isDark.value && fileStore.previewDarkAdapt)
-const togglePaperDarkAdapt = () => {
-  fileStore.setPreviewDarkAdapt(!fileStore.previewDarkAdapt)
-}
 
 const previewContainer = inject('previewContainer')
 const activeMode = inject('activeMode')
