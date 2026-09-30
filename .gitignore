@@ -113,3 +113,15 @@ __tests__/tmp_compile/shared/
 nul
 *.docx
 
+
+# ---- 批次4 仓库卫生：调试脚本/会话转储/杂项不再入库（本地文件保留） ----
+/_*.cjs
+/_*.mjs
+/__*.ps1
+/extracted_html.html
+/test.html
+/ssh_test.txt
+/lancedbNativePro.ts
+/*nul_resp.txt
+/.sisyphus/
+yarn.lock
