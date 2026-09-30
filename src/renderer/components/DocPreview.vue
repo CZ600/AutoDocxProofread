@@ -343,19 +343,6 @@ const loadFile = async (
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     })
 
-// 应用/撤销/分类分组等结果动作收敛在 useCorrectionActions（批次 9）；
-// 整篇重渲染重放（依赖 cachedDocxFile/renderDocx）作为依赖注入
-const {
-  highlightCorrections,
-  availableCategories,
-  getCategoryCount,
-  applyByCategory,
-  applyALLCorrection,
-  appliedCategories,
-  getAppliedCategoryCount,
-  undoByCategory,
-  undoAllCorrections
-} = useCorrectionActions({ previewContainer, proofreadingResults, fileStore, t }, { rerenderAndReapply })
     const file = new File([blob], name, {
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     })
@@ -498,12 +485,11 @@ const onSubmit = async () => {
 
     // 两条链路（知识库 RAG / 直读）仅差第 3、4 个参数，其余处理完全一致，合并为单次调用
     const hasKnowledgeBase = selectedRepositories.value.length > 0
-    const embeddingConfig = hasKnowledgeBase
-      ? (() => {
-          const { apiURL, apiKey, modelName } = embeddingStore.getAPIConfig
-          return { apiURL, apiKey, modelName }
-        })()
-      : undefined
+    let embeddingConfig
+    if (hasKnowledgeBase) {
+      const { apiURL, apiKey, modelName } = embeddingStore.getAPIConfig
+      embeddingConfig = { apiURL, apiKey, modelName }
+    }
     let preResult = await electronAPI.processDocx(
       form.value.model,
       form.value.filePath,
@@ -518,7 +504,7 @@ const onSubmit = async () => {
     )
     // 用户取消：主进程中止了在途请求，走取消流程而非报错
     if (preResult?.cancelled) {
-      abortProgress()
+      progressRef.value?.abort()
       ElMessage({
         message: t('proof.messages.proofCancelled'),
         type: 'info',
@@ -528,7 +514,7 @@ const onSubmit = async () => {
     }
     if ('message' in preResult && preResult.message) {
       // 主进程返回 message 说明参数或链路有问题：统一走错误提示，避免静默空结果
-      abortProgress()
+      progressRef.value?.abort()
       if (preResult.message === 'Please select an API setting!') {
         ElMessage({
           message: t('proof.errors.apiKeyRequired'),
@@ -608,6 +594,20 @@ const onSubmit = async () => {
     processing.value = false
   }
 }
+
+// 应用/撤销/分类分组等结果动作收敛在 useCorrectionActions（批次 9）；
+// 整篇重渲染重放（依赖 cachedDocxFile/renderDocx）作为依赖注入
+const {
+  highlightCorrections,
+  availableCategories,
+  getCategoryCount,
+  applyByCategory,
+  applyALLCorrection,
+  appliedCategories,
+  getAppliedCategoryCount,
+  undoByCategory,
+  undoAllCorrections
+} = useCorrectionActions({ previewContainer, proofreadingResults, fileStore, t }, { rerenderAndReapply })
 
 const initCorrectStatus = async () => {
   // getter 原误写为 isfilePathEmpty（恒为 undefined→条件恒真），修正为按「已选文件」判断回填

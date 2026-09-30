@@ -68,6 +68,10 @@ import { ElPopover } from 'element-plus'
 // styleObj 为父级响应式对象的引用（formatItem.paragraphStyle / runStyle 或
 // defaults 的同名对象）。与原实装一致采用原位改写：布尔开关/步进/取色
 // 直接写回对象属性，父级的响应式随之更新，无需 emit 中转。
+// 该「可变记录共享」是有意契约（父级拥有对象、原位编辑即接口，
+// 等价于拆分前 ProofClone 内 item[styleType][key] 的直改写），
+// 故对 vue/no-mutating-props 做定点豁免。
+/* eslint-disable vue/no-mutating-props */
 const props = defineProps({
   styleObj: { type: Object, required: true }
 })

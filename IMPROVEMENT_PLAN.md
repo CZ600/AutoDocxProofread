@@ -277,16 +277,26 @@
 
 ### 任务清单
 
-- [ ] **typeMap/类型色板收敛（先行热身，低风险）**：新建 `src/shared/correctionTypes.ts`（8 种错误类型的 key/中英文名/颜色 token 引用），替换 5 份拷贝：`Proof.vue:199-211`、`DocPreview.vue:502-514/517-526/616-625`、`history.vue:285-297`；同时统一类型 key 为英文（消除 `.highlight-type-错别字` 这类中文类名依赖，CSS 改用英文 type key + tokens 颜色），`.type-*/.category-*` 颜色样式从 Proof.vue 与 history.vue 两处维护收敛到一处。
-- [ ] **FormatClone 抽 StylePropsEditor**：`FormatClone.vue:96-366` 四段几乎逐字相同的属性编辑模板（paragraphStyle/runStyle/defaults.paragraphStyle/defaults.runStyle）+ 成对复制的 `toggleStyleProp/stepValue/setColor` 与 `toggleDefaultsProp/stepDefaultsValue/setDefaultsColor`（`:510-558`）→ 抽 `StylePropsEditor.vue`（props: styleObj，emit update），预计 -500 行。
-- [ ] **DocPreview 拆分**（2328 行，至少混 7 种职责）：
+- [x] **typeMap/类型色板收敛（先行热身，低风险）**：新建 `src/shared/correctionTypes.ts`（8 种错误类型的 key/中英文名/颜色 token 引用），替换 5 份拷贝：`Proof.vue:199-211`、`DocPreview.vue:502-514/517-526/616-625`、`history.vue:285-297`；同时统一类型 key 为英文（消除 `.highlight-type-错别字` 这类中文类名依赖，CSS 改用英文 type key + tokens 颜色），`.type-*/.category-*` 颜色样式从 Proof.vue 与 history.vue 两处维护收敛到一处。
+- [x] **FormatClone 抽 StylePropsEditor**：`FormatClone.vue:96-366` 四段几乎逐字相同的属性编辑模板（paragraphStyle/runStyle/defaults.paragraphStyle/defaults.runStyle）+ 成对复制的 `toggleStyleProp/stepValue/setColor` 与 `toggleDefaultsProp/stepDefaultsValue/setDefaultsColor`（`:510-558`）→ 抽 `StylePropsEditor.vue`（props: styleObj，emit update），预计 -500 行。
+- [x] **DocPreview 拆分**（2328 行，至少混 7 种职责）：
   - `WindowControls.vue`（`:277-301` 自定义窗口按钮）
   - `RecentFiles.vue`（`:111-160/223-235/304-329` 最近文件下拉+空态卡片）
   - `ProofProgress.vue`（`:75-103` + 进度/流式/取消状态机组，20+ 个相关 ref）
   - `KbSelector.vue`（知识库选择器）
   - DocPreview 保留文件选择与整体编排。
-- [ ] **App.vue ↔ FormatClone 解耦**：`App.vue:121-140` 通过 `formatCloneRef.value?.cloning?.value` 等 8 个 computed 桥接 FormatClone 的 defineExpose（`FormatClone.vue:984-993`）再 provide 给 DocPreview → 新建 pinia `formatCloneStore` 承载 cloning/progress 状态，删除 ref 桥接与 provide 链。
-- [ ] **公共样式类收敛**：`.section-header/.setting-section/.section-description` 在 9 个组件逐字重复 → 合入 tokens.css 全局工具类。
+- [x] **App.vue ↔ FormatClone 解耦**：`App.vue:121-140` 通过 `formatCloneRef.value?.cloning?.value` 等 8 个 computed 桥接 FormatClone 的 defineExpose（`FormatClone.vue:984-993`）再 provide 给 DocPreview → 新建 pinia `formatCloneStore` 承载 cloning/progress 状态，删除 ref 桥接与 provide 链。
+- [x] **公共样式类收敛**：`.section-header/.setting-section/.section-description` 在 9 个组件逐字重复 → 合入 tokens.css 全局工具类。
+
+**实施说明（2026-10-01）**：
+- **类型收敛**：`src/shared/correctionTypes.ts` 提供 `canonicalCorrectionType`（中文/大小写变体 → 规范英文 key）、`correctionTypeCssKey`、`correctionTypeLabel(t)` 三件套；Proof/DocPreview/history 的 5 份 typeMap 拷贝删除，类型分组/统计/CSS 类名三处消费统一归一（数据中存储的 type 保持 LLM 原值，历史库兼容；中文变体与英文 key 并入同一分组/统计——行为增强但口径更一致）。type-/category-/highlight-type- 三族色板唯一维护在 common.css，`.type-错别字` 等中文类名依赖消除。
+- **StylePropsEditor**：`components/format/StylePropsEditor.vue` 以 props 直引用响应式 style 对象原位改写（与原行为一致，无 emit 中转）；四段 271 行模板收敛为 4 个用法标签，编辑方法八份成对拷贝删净。配套：spec/profile 纯函数迁 `utils/formatCloneSpec.js`，docx 渲染收敛 `utils/previewRender.js`，三处重复的结果重置合并 `resetResults()`，FormatClone 顺带清理失效 CSS（.clone-header/.header-title/.ref-file-row/.detail-row）。1522 → 893 行。
+- **DocPreview 拆分**：`WindowControls`（窗口按钮）、`RecentFiles`（最近文件下拉，popper 样式全局块随迁）、`RecentFileCards`（空态卡片）、`KbSelector`（知识库下拉，v-model 选中列表，store 刷新随组件 onMounted）、`ProofProgress`（进度/流式/取消状态机自包含，IPC 侦听/计时器随组件生命周期，父级经 ref 调 open/finish/abort）；动作层（应用/撤销/分类分组 + results 兜底侦听）抽 `composables/useCorrectionActions.js`（整篇重渲染重放作依赖注入），pushToDB 迁 `utils/proofHistory.js`，onSubmit 的知识库/直读双分支合并为单次 processDocx 调用（仅差 2 个参数），预览全局样式迁 `assets/css/preview.css`（renderer.ts 引入）。2405 → 840 行。
+- **App↔FormatClone 死桥接（计划变更）**：核查发现 8 个 formatClone provide **无任何 inject 消费方**（批次 5 把 FormatClone 改为 App 内异步组件后 DocPreview 的消费链已断），即死代码——未新建 formatCloneStore，直接删除桥接链与 defineExpose。若后续需要在预览工具栏展示克隆状态，再按 pinia store 方案重建。
+- **公共样式收敛（计划变更）**：`.section-description` 已在批次 7 改造中不存在（说明文字改悬停提示）；实际收敛 `.setting-section/.section-header`（+icon 规则）亮色基类至 common.css，9 个组件（api×6、prompt×2、APISet）逐字拷贝删除，RateLimit/APISet/Dictionary 仅保留与基类的差异项（margin/mb 差异）。
+- 顺带修复：`correctionTypes.ts` 注释中 `*/` 序列提前终止块注释导致的构建失败。
+- 验证：`npm run build` 绿；`npm test` 144 通过 / 20 失败（失败集合与基线完全一致，均为既有真实 LLM 集成用例）；批次 9 全部触达文件 eslint 复核——新增文件零问题（StylePropsEditor 对 `vue/no-mutating-props` 做定点豁免：可变记录共享是有意契约，等价于拆分前的直改写），存量 error 仅历史遗留（ipcHandlers 行内 require、Proof/Dictionary/history 组件名单词、既有的 no-empty-function 等）。lint 过程中抓到并修复两处 `abortProgress()` 未定义残留与 composable 块误插入位置。
+- 待人工回归：校对全流程（选文件→四模式→应用/撤销/忽略/编辑→批量应用→导出→历史入库）、格式克隆全流程（参考文档/描述→分析→编辑属性→克隆→导出）、知识库选择、最近文件、窗口控制按钮、进度条与取消、明暗两主题下各新增组件外观。git diff 审查确认均为结构移动（合并双分支与 resetResults 去重两处为等价逻辑收敛）。
 
 ### 风险
 

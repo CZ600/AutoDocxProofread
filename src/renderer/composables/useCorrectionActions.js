@@ -9,7 +9,7 @@
 
 import { computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { applyCorrectionsToPreview, undoCorrectionsInPreview } from '../utils/correctionMatching'
+import { undoCorrectionsInPreview } from '../utils/correctionMatching'
 import { applyAndHighlightCorrections, highlightCorrections as rebuildPreviewHighlights } from '../utils/highlight'
 import { canonicalCorrectionType, correctionTypeLabel } from '../../shared/correctionTypes'
 
