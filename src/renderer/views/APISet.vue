@@ -21,24 +21,26 @@
 
           <div class="setting-group">
             <div class="setting-group-title">{{ t('apiSettings.groupRuntime') }}</div>
-            <TokenStatistics />
-            <ConcurrencySettings />
-            <RateLimitSettings />
-            <ThinkingSettings />
-            <ProxySettings />
-          </div>
-
-          <div class="setting-section">
-            <div class="section-header">
-              <el-icon><Connection /></el-icon>
-              <span>{{ t('apiSettings.languageLabel') }}</span>
-            </div>
-            <div class="lang-row">
-              <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
-              <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
-                <el-option label="简体中文" value="zh-CN" />
-                <el-option label="English" value="en" />
-              </el-select>
+            <!-- 两列网格：小控件卡片成对排列，避免单列长滚动；窄窗口自动回落单列 -->
+            <div class="setting-grid">
+              <TokenStatistics />
+              <ConcurrencySettings />
+              <RateLimitSettings />
+              <ThinkingSettings />
+              <ProxySettings />
+              <div class="setting-section setting-section--lang">
+                <div class="section-header">
+                  <el-icon><Connection /></el-icon>
+                  <span>{{ t('apiSettings.languageLabel') }}</span>
+                </div>
+                <div class="lang-row">
+                  <span class="lang-desc">{{ t('apiSettings.languageDesc') }}</span>
+                  <el-select v-model="currentLocale" size="default" class="lang-select" @change="handleLocaleChange">
+                    <el-option label="简体中文" value="zh-CN" />
+                    <el-option label="English" value="en" />
+                  </el-select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -51,9 +53,10 @@
             <div class="section-header">
               <el-icon><CircleCheck /></el-icon>
               <span>{{ t('apiSettings.reviewModelConfig') }}</span>
-            </div>
-            <div class="review-model-desc">
-              {{ t('apiSettings.reviewModelDesc') }}
+              <!-- 说明文字改为悬停提示：与其余设置卡片同一样式 -->
+              <el-tooltip effect="dark" :content="t('apiSettings.reviewModelDesc')" placement="top" popper-class="settings-hint-popper">
+                <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
+              </el-tooltip>
             </div>
             <div class="review-switch-row">
               <el-switch v-model="reviewEnabled" @change="handleToggleReview" />
@@ -112,7 +115,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
-import { CircleCheck, Cpu, Select, Delete, Connection } from '@element-plus/icons-vue'
+import { CircleCheck, Cpu, Select, Delete, Connection, QuestionFilled } from '@element-plus/icons-vue'
 import ApiSelector from '../components/api/ApiSelector.vue'
 import AddApiDialog from '../components/api/AddApiDialog.vue'
 import TokenStatistics from '../components/api/TokenStatistics.vue'
@@ -304,6 +307,10 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* 内容限宽居中：宽窗口下卡片不再横向拉满整屏 */
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 /* 分组容器：让一组相关卡片在视觉上聚合，并统一内边距节奏 */
@@ -318,6 +325,29 @@ onMounted(async () => {
   margin-bottom: 0;
 }
 
+/* 两列网格：每行卡片等高对齐，窄窗口回落单列 */
+.setting-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.setting-grid > :deep(.setting-section) {
+  margin: 0;
+  height: 100%;
+}
+
+@media (max-width: 1100px) {
+  .setting-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setting-grid > :deep(.setting-section) {
+    height: auto;
+  }
+}
+
 /* 分组小标题：提供层次感 */
 .setting-group-title {
   margin-top: 12px;
@@ -330,15 +360,10 @@ onMounted(async () => {
   text-transform: uppercase;
 }
 
-/* 统一所有子卡片的边距节奏 */
-.tab-content :deep(.setting-section) {
+/* 统一所有子卡片的边距节奏（网格内的卡片由 .setting-grid 归零外边距） */
+.tab-content > :deep(.setting-section) {
   margin-bottom: 12px;
   padding: 16px 18px;
-}
-
-.tab-content > :deep(.setting-section:last-child),
-.setting-group > :deep(.setting-section:last-child) {
-  margin-bottom: 0;
 }
 
 .fade-slide {
@@ -372,15 +397,16 @@ onMounted(async () => {
   font-size: 16px;
 }
 
-.review-model-desc {
-  color: #8a929e;
-  font-size: 13px;
-  line-height: 1.7;
-  margin-bottom: 16px;
-  padding: 10px 14px;
-  border-radius: 6px;
-  background: #f4f6f9;
-  border: none;
+/* 悬停提示图标：与 TokenStatistics 的提示符号同一配色 */
+.tooltip-icon {
+  cursor: help;
+  color: #a0b3c4;
+  font-size: 15px;
+  transition: color 0.25s;
+}
+
+.tooltip-icon:hover {
+  color: #7b9eb8;
 }
 
 .review-switch-row {
@@ -530,9 +556,12 @@ html.dark .section-header {
   color: #c0c4cc;
 }
 
-html.dark .review-model-desc {
-  color: #8a8a8a;
-  background: #1a1a1a;
+html.dark .tooltip-icon {
+  color: #666666;
+}
+
+html.dark .tooltip-icon:hover {
+  color: #8ec5ff;
 }
 
 html.dark .review-switch-label {
