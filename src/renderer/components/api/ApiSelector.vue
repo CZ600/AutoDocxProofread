@@ -3,11 +3,11 @@
     <div class="section-header">
       <el-icon><Connection /></el-icon>
       <span>{{ t('apiSelector.title') }}</span>
+      <!-- 说明文字改为悬停提示：与 TokenStatistics 的累计Token问号提示同一样式 -->
+      <el-tooltip effect="dark" :content="t('apiSelector.description')" placement="top" popper-class="settings-hint-popper">
+        <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
+      </el-tooltip>
     </div>
-    <p class="section-description">
-      <el-icon><InfoFilled /></el-icon>
-      {{ t('apiSelector.description') }}
-    </p>
     <el-form :model="selectedApi" label-width="auto">
       <el-form-item :label="t('apiSelector.currentAPI')" class="form-item-enhanced">
         <el-select v-model="selectedApi.id" :placeholder="t('apiSelector.selectPlaceholder')" class="api-select">
@@ -55,7 +55,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Delete, Edit, Connection, Plus, Cpu, InfoFilled } from '@element-plus/icons-vue'
+import { Delete, Edit, Connection, Plus, Cpu, QuestionFilled } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useI18n } from 'vue-i18n'
 import { useApiSettings } from '../../composables/useApiSettings'
@@ -145,25 +145,16 @@ const handleTest = async () => {
   font-size: 16px;
 }
 
-.section-description {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 15px;
-  margin-top: 0;
-  padding: 10px 14px;
-  background-color: #f4f6f9;
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: #7a8694;
-  border: none;
+/* 悬停提示图标：与 TokenStatistics 的提示符号同一配色 */
+.tooltip-icon {
+  cursor: help;
+  color: #a0b3c4;
+  font-size: 15px;
+  transition: color 0.25s;
 }
 
-.section-description .el-icon {
-  color: #8eafc4;
-  margin-top: 2px;
-  flex-shrink: 0;
+.tooltip-icon:hover {
+  color: #7b9eb8;
 }
 
 .form-item-enhanced {
@@ -266,12 +257,11 @@ html.dark .section-header .el-icon {
   color: #8ec5ff;
 }
 
-html.dark .section-description {
-  background-color: #1a1a1a;
-  color: #a0a0a0;
+html.dark .tooltip-icon {
+  color: #666666;
 }
 
-html.dark .section-description .el-icon {
+html.dark .tooltip-icon:hover {
   color: #8ec5ff;
 }
 
