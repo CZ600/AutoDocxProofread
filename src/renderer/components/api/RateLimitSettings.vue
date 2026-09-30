@@ -3,12 +3,12 @@
     <div class="section-header">
       <el-icon><Timer /></el-icon>
       <span>{{ t('rateLimit.title') }}</span>
+      <!-- 说明文字改为悬停提示：与 TokenStatistics 的累计Token问号提示同一样式 -->
+      <el-tooltip effect="dark" :content="t('rateLimit.description')" placement="top" popper-class="settings-hint-popper">
+        <el-icon class="tooltip-icon"><QuestionFilled /></el-icon>
+      </el-tooltip>
     </div>
     <div class="setting-body">
-      <p class="section-description">
-        <el-icon><InfoFilled /></el-icon>
-        {{ t('rateLimit.description') }}
-      </p>
       <el-button
         :type="openTimeLimit ? 'primary' : 'default'"
         @click="handleToggleLimit"
@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { Timer, InfoFilled } from '@element-plus/icons-vue'
+import { Timer, QuestionFilled } from '@element-plus/icons-vue'
 import { useApiSettings } from '../../composables/useApiSettings'
 
 const { t } = useI18n()
@@ -87,25 +87,16 @@ const handleTimeoutChange = (value: number | undefined) => {
   padding: 4px 0;
 }
 
-.section-description {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 15px;
-  margin-top: 0;
-  padding: 10px 14px;
-  background-color: #f4f6f9;
-  border-radius: 6px;
-  font-size: 13px;
-  line-height: 1.7;
-  color: #7a8694;
-  border: none;
+/* 悬停提示图标：与 TokenStatistics 的提示符号同一配色 */
+.tooltip-icon {
+  cursor: help;
+  color: #a0b3c4;
+  font-size: 15px;
+  transition: color 0.25s;
 }
 
-.section-description .el-icon {
-  color: #8eafc4;
-  margin-top: 2px;
-  flex-shrink: 0;
+.tooltip-icon:hover {
+  color: #7b9eb8;
 }
 
 .toggle-btn {
@@ -193,6 +184,12 @@ const handleTimeoutChange = (value: number | undefined) => {
 </style>
 
 <style>
+/* 说明文字气泡：限定宽度避免长句拉成一行（popper 挂在 body 层，需全局样式） */
+.settings-hint-popper {
+  max-width: 320px;
+  line-height: 1.6;
+}
+
 html.dark .setting-section {
   background-color: #000000;
 }
@@ -205,12 +202,11 @@ html.dark .section-header .el-icon {
   color: #8ec5ff;
 }
 
-html.dark .section-description {
-  background-color: #1a1a1a;
-  color: #a0a0a0;
+html.dark .tooltip-icon {
+  color: #666666;
 }
 
-html.dark .section-description .el-icon {
+html.dark .tooltip-icon:hover {
   color: #8ec5ff;
 }
 
