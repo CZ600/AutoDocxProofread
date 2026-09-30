@@ -4,7 +4,6 @@ import sqlite3 from 'sqlite3'
 import path from 'path' // 新增导入
 import fs from 'fs'
 import { promises } from 'dns'
-import { b } from 'vite/dist/node/types.d-aGj9QkWt'
 import { getEmbedding } from './chat'
 import { ModelProvider } from '../shared/modelProviders'
 import { encryptApiKey, decryptApiKey } from './apiKeyCrypto'

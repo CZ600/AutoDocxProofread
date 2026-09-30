@@ -24,7 +24,6 @@ import {
   ProofreadCancelToken
 } from './proof'
 import { deleteDocumentByName, listFilenamesInRepository } from './lancedb'
-import { Mode } from '@google/genai'
 import * as mammoth from 'mammoth'
 import { replaceTextInDocx } from './wordProcess'
 import { cloneFormat, extractFormatProfile, cloneFormatWithProfile, cloneFormatWithProfileForce } from './formatClone'
@@ -42,9 +41,7 @@ import {
   createRepository
 } from './lancedb'
 import { processDocument, getPDFDocumentChunks } from './pdfUtils'
-import { list } from 'changelog.config'
-import { error } from 'console'
-import { eventNames, env } from 'process'
+import { env } from 'process'
 import { ProofreadProgressPayload, ProofreadStreamPayload, ProofreadMode } from '../shared/proofreadProgress'
 // const { platform, arch, env } = process;
 export interface apiSettings {
