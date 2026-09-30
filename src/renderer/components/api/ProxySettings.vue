@@ -9,10 +9,6 @@
       </el-tooltip>
     </div>
     <div class="setting-body">
-      <p class="section-description">
-        <el-icon><InfoFilled /></el-icon>
-        {{ t('proxy.description') }}
-      </p>
       <el-form label-width="auto">
         <el-form-item :label="t('proxy.enableProxy')" class="form-item-enhanced">
           <el-switch

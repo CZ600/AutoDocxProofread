@@ -9,10 +9,6 @@
       </el-tooltip>
     </div>
     <div class="setting-body">
-      <p class="section-description">
-        <el-icon><InfoFilled /></el-icon>
-        {{ t('thinking.description') }}
-      </p>
       <div class="thinking-row">
         <el-select :model-value="thinkingMode" size="default" class="thinking-select" @update:model-value="handleChange">
           <el-option :label="t('thinking.modeDefault')" value="default" />
