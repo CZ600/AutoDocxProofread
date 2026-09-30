@@ -164,7 +164,7 @@
             <span>{{ activeMode === 'format-clone' ? t('proof.formatClone.backToProof') : t('proof.formatClone.title') }}</span>
           </el-button>
 
-          <!-- 暗色纸面适配开关：仅暗色主题显示；默认关闭保持文档原有白底黑字 -->
+          <!-- 暗色纸面适配开关：仅暗色主题显示；默认开启跟随主题，关闭保持文档白底（所见即所得） -->
           <el-tooltip
             v-if="isDark"
             :content="t('proof.previewDarkAdaptTip')"
@@ -392,8 +392,8 @@ const router = useRouter()
 const { t } = useI18n()
 const isDark = useDark()
 
-// 暗色纸面适配：默认所见即所得（文档保持白底黑字），
-// 开启后（且处于暗色主题）文档纸面跟随渲染为深色
+// 暗色纸面适配：默认跟随主题（暗色下文档从白底黑字切为黑底白字，与历史行为一致），
+// 关闭后文档保持原有白底（所见即所得）
 const paperDarkAdapt = computed(() => isDark.value && fileStore.previewDarkAdapt)
 const togglePaperDarkAdapt = () => {
   fileStore.setPreviewDarkAdapt(!fileStore.previewDarkAdapt)

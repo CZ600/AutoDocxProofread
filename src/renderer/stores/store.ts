@@ -30,8 +30,9 @@ export const fileInfoStore = defineStore('fileInfo', {
     // 侧边栏聚焦信号：点击右侧预览高亮时，请求左侧校对列表滚动/展开到对应项
     sidebarFocusIndex: -1,
     sidebarFocusVersion: 0,
-    // 暗色主题下文档预览纸面是否跟随变暗：默认 false 保持文档原有白底黑字（所见即所得）
-    previewDarkAdapt: false
+    // 暗色主题下文档预览纸面是否跟随变暗：默认 true 与历史行为一致
+    // （明暗切换时文档从白底黑字切为黑底白字）；关闭后保持文档原有白底（所见即所得）
+    previewDarkAdapt: true
   }),
 
   getters: {
