@@ -36,6 +36,28 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'index.html')
+        },
+        output: {
+          // vendor 拆包：element-plus / vue 全家 / 其余三方各自成 chunk，
+          // 业务代码更新时这三块走缓存，不必随业务重新下载
+          manualChunks(id) {
+            if (!id.includes('node_modules')) {
+              return undefined
+            }
+            // 兼容 Windows 反斜杠与 POSIX 正斜杠路径
+            const normalized = id.replaceAll('\\', '/')
+            if (normalized.includes('/node_modules/element-plus/') || normalized.includes('/node_modules/@element-plus/')) {
+              return 'element-plus'
+            }
+            if (
+              /[\\/]node_modules[\\/](vue|@vue|vue-router|pinia|pinia-plugin-persistedstate|vue-demi|vue-i18n|@intlify|@vueuse)[\\/]/.test(
+                normalized
+              )
+            ) {
+              return 'vue-vendor'
+            }
+            return 'vendor'
+          }
         }
       }
     },

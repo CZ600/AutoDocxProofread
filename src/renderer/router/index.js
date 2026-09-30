@@ -1,10 +1,12 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
-import About from '../views/About.vue'
-import APISet from '../views/APISet.vue'
-import Proof from '../views/Proof.vue'
-import ProofSet from '../views/ProofSet.vue'
-import History from '../views/history.vue'
-import Knowledge from '../views/Dictionary.vue'
+
+// 路由级代码分割：页面组件按需加载，首屏只拉取校对页所在 chunk
+const About = () => import('../views/About.vue')
+const APISet = () => import('../views/APISet.vue')
+const Proof = () => import('../views/Proof.vue')
+const ProofSet = () => import('../views/ProofSet.vue')
+const History = () => import('../views/history.vue')
+const Knowledge = () => import('../views/Dictionary.vue')
 
 const routes = [
   {

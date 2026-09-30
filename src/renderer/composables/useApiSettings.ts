@@ -377,21 +377,33 @@ export function useApiSettings() {
     }
   }
 
-  watch(
-    () => apiStore.selectedApi.id,
-    newId => {
-      if (newId === null) {
-        return
-      }
+  // ---- 选中 API 侦听：模块级单例 ----
+  // 本 composable 的全部状态都是 apiStore 的 computed，侦听逻辑只依赖 store。
+  // 若放在函数体内，APISet 页 6 个组件实例会各注册一份 immediate watch，
+  // 页面每次进入重复触发 6 次 selectApi IPC；收敛为首个实例注册一次。
+  let selectionWatchRegistered = false
+  const ensureSelectionWatch = () => {
+    if (selectionWatchRegistered) {
+      return
+    }
+    selectionWatchRegistered = true
+    watch(
+      () => apiStore.selectedApi.id,
+      newId => {
+        if (newId === null) {
+          return
+        }
 
-      if (apiStore.apiSettings.length > 0) {
-        selectApi(newId)
-      } else {
-        console.warn('apiSettings 列表为空，忽略本次 API 选择')
-      }
-    },
-    { immediate: true }
-  )
+        if (apiStore.apiSettings.length > 0) {
+          selectApi(newId)
+        } else {
+          console.warn('apiSettings 列表为空，忽略本次 API 选择')
+        }
+      },
+      { immediate: true }
+    )
+  }
+  ensureSelectionWatch()
 
   return {
     selectedApi,
