@@ -11,6 +11,17 @@ let port = 0
 let lastBody: any = null
 
 beforeAll(async () => {
+  // 本机开发 Node 为 v16，缺少 fetch/Headers 等 fetch API 全局，而 openai v5 SDK 强制要求
+  // （应用运行于 Electron 内置新 Node 不受影响，仅测试环境用依赖树中的 node-fetch 打补丁）
+  if (typeof globalThis.fetch === 'undefined') {
+    const nodeFetch = await import('node-fetch')
+    ;(globalThis as any).fetch = nodeFetch.default
+    ;(globalThis as any).Headers = nodeFetch.Headers
+    ;(globalThis as any).Request = nodeFetch.Request
+    ;(globalThis as any).Response = nodeFetch.Response
+    // SDK 构建请求体时会对 FormData 做 instanceof 判断；测试请求均为 JSON，空壳类即可
+    ;(globalThis as any).FormData = class FormData {}
+  }
   server = http.createServer((req, res) => {
     let raw = ''
     req.on('data', (c: Buffer) => (raw += c.toString('utf-8')))
