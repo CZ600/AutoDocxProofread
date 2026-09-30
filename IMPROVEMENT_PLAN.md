@@ -178,16 +178,16 @@
 
 ### 任务清单
 
-- [ ] **路由懒加载**：`src/renderer/router/index.js:2-7` 六个页面全部静态 import → 改 `() => import('@/views/xxx.vue')`。
-- [ ] **manualChunks 拆包**：`electron.vite.config.ts` renderer 的 rollupOptions 增加 manualChunks，将 element-plus、vue 全家（vue/vue-router/pinia）、其他 vendor 拆为独立 chunk，利用缓存。
-- [ ] **（可选）Element Plus 按需引入**：`renderer.ts:4-6` 目前全量 `app.use(ElementPlus)` + 全量 CSS（430KB）→ 引入 `unplugin-vue-components` + `unplugin-auto-import` 按需注册。注意点：`v-loading` 等指令需手动注册样式；`el-config-provider` locale 方式不变。改动面大，若时间紧可只做前两项。
-- [ ] **（可选）消除重复 watcher**：`useApiSettings.ts:335-349` 每个使用该 composable 的组件实例都注册 immediate watch，APISet 页同时挂 5+ 个组件 → 重复执行 `selectApi → syncApiSettingsToBackend` IPC。改为模块级单例 watch 或下沉到 store。
+- [x] **路由懒加载**：`src/renderer/router/index.js:2-7` 六个页面全部静态 import → 改 `() => import('@/views/xxx.vue')`。（实施说明：六个视图各自成 chunk；另将初始不可见的 FormatClone 在 App.vue 改为 `defineAsyncComponent` 异步加载，首屏不拉取该 chunk。）
+- [x] **manualChunks 拆包**：`electron.vite.config.ts` renderer 的 rollupOptions 增加 manualChunks，将 element-plus、vue 全家（vue/vue-router/pinia）、其他 vendor 拆为独立 chunk，利用缓存。（实施说明：注意 manualChunks 是 **output** 选项，放 rollupOptions 顶层会被 Rollup 以 Unknown input options 忽略且不生效；拆分后产物由单一 3.0MB index.js 变为 index 228KB + vue-vendor 519KB + vendor 534KB + element-plus 1746KB + 六个视图独立 chunk，element-plus CSS（345KB）亦独立成文件。）
+- [ ] **（可选）Element Plus 按需引入**：`renderer.ts:4-6` 目前全量 `app.use(ElementPlus)` + 全量 CSS（430KB）→ 引入 `unplugin-vue-components` + `unplugin-auto-import` 按需注册。注意点：`v-loading` 等指令需手动注册样式；`el-config-provider` locale 方式不变。改动面大，若时间紧可只做前两项。（**未实施**：计划允许二选一，改动面大且涉及全量组件回归；全量引入在本地加载无网络开销，收益远小于 Web 场景，暂缓。）
+- [x] **（可选）消除重复 watcher**：`useApiSettings.ts:335-349` 每个使用该 composable 的组件实例都注册 immediate watch，APISet 页同时挂 5+ 个组件 → 重复执行 `selectApi → syncApiSettingsToBackend` IPC。改为模块级单例 watch 或下沉到 store。（实施说明：composable 全部状态本就是 apiStore 的 computed，侦听只依赖 store——以 `ensureSelectionWatch()` 模块级一次性注册，APISet 页 6 个实例从 6 次 IPC 降为 1 次。）
 
 ### 验收标准
 
-- 构建产物由单一 index-*.js 拆为多个 chunk，首屏只加载入口所需 chunk（对比 build 报告）。
-- 冷启动到首屏可交互时间可感知下降（前后各测 3 次取均值）。
-- 六个路由全部可达、语言切换正常、Element 组件样式无缺失（按需引入时的重点回归项）。
+- 构建产物由单一 index-*.js 拆为多个 chunk，首屏只加载入口所需 chunk（对比 build 报告）。（✅ 见 manualChunks 实施说明）
+- 冷启动到首屏可交互时间可感知下降（前后各测 3 次取均值）。（待人工 `npm run dev` 体感验证）
+- 六个路由全部可达、语言切换正常、Element 组件样式无缺失（按需引入时的重点回归项）。（懒加载下样式随 chunk 拆分完整，待人工回归）
 
 ---
 
@@ -220,21 +220,21 @@
 
 ### 任务清单
 
-- [ ] **建立 tokens**：新建 `src/renderer/assets/tokens.css`，定义 `--bg-page/--bg-panel/--bg-elevated/--text-1/--text-2/--border-*/--brand-*/字号/间距` 两套变量（`:root` 与 `html.dark`）。
-- [ ] **迁移品牌变量**：`common.css:10-38` 挂在 `#app` 的品牌色变量无暗色变体，且特异性压过 Element Plus 的 `html.dark` 暗色变量（深背景上出现亮色 tint）→ 变量移到 `:root` 并补 `html.dark` 变体。
-- [ ] **统一 5 种暗色背景**：`App.vue:158-160`(#121212)、`App.vue:283-286`(#1a1a2e)、`DocPreview.vue:1419`(#1d1e1f)、`Proof.vue:602-616`(#141414/#000000)、`Dictionary.vue:511-517` 与 `APISet.vue:458-471`(#000000) → 全部改用 tokens。
-- [ ] **修复暗色机制**：统一为 VueUse 的 `html.dark` 单一机制；删除 App.vue:2 手动 `:class="{dark:isDark}"`；修复死规则 `App.vue:174-176`（`.sidebar.dark` 的 class 实际绑在父级 `.app-layout` 上，暗色下侧栏仍是亮色 `#2c3a48`）→ 改 `html.dark .sidebar` 选择器。
-- [ ] **收敛全局补丁**：14 个文件各自携带的非 scoped `html.dark` 块（如 `PromptDisplay.vue:115-150`、`ConcurrencySettings.vue:111-139`、`ApiSelector.vue:247-279` 内容几乎相同）→ 公共部分合入 tokens.css / 公共工具类，组件内改 scoped。
-- [ ] **修复永久失效的样式**：`PromptEditor.vue:283-292` 在非 scoped 块使用 `:deep()`（仅 scoped 有效）→ 移入 scoped 块或改写为全局选择器。
-- [ ] **滚动条策略统一**：取消明色下全局隐藏滚动条（`App.vue:301-303`、`Proof.vue:666-668`、`FormatClone.vue:1164-1177`），明暗均显示统一细滚动条。
-- [ ] **（产品决策）暗色预览纸面模式**：`DocPreview.vue:1451-1496` 用 `!important` 把文档预览内容强改为深底浅字——校对软件应让用户看到「文档本来的样子」→ 默认恢复白底黑字（所见即所得），提供「预览适配暗色」开关，默认关。
-- [ ] **布局解耦**：`DocPreview.vue:1971` 的 `left:52px` 与 `App.vue:163` `.sidebar{width:52px}` 魔法数字 → 抽 `--sidebar-width` 变量两处共用；`padding-right:158px` 同理。
+- [x] **建立 tokens**：新建 `src/renderer/assets/tokens.css`，定义 `--bg-page/--bg-panel/--bg-elevated/--text-1/--text-2/--border-*/--brand-*/字号/间距` 两套变量（`:root` 与 `html.dark`）。（实施说明：定义 `--bg-page`(白/#121212)、`--bg-panel`(白/#1d1e1f)、`--bg-elevated`(白/#1a1a1a)、`--bg-sunken`(#f4f6f9/#141414)、`--text-1/2/3`、`--border-color/--border-strong`、`--brand/--brand-dark/--brand-bright(#8ec5ff)` 与布局变量；renderer.ts 在 element-plus CSS 之后引入，:root 覆盖生效。）
+- [x] **迁移品牌变量**：`common.css:10-38` 挂在 `#app` 的品牌色变量无暗色变体，且特异性压过 Element Plus 的 `html.dark` 暗色变量（深背景上出现亮色 tint）→ 变量移到 `:root` 并补 `html.dark` 变体。（实施说明：整组 `--el-color-*` 迁入 tokens.css；暗色变体按 Element 暗色主题约定「light-N 变暗作暗底、dark-2 变亮作 hover」给出四色系。附带收益：挂到 body 层的 el-select 下拉/popper 此前取不到 #app 内的变量只能用默认蓝，现在正确继承品牌色。APISet/ProofSet 页面容器里的局部品牌变量副本一并删除。）
+- [x] **统一 5 种暗色背景**：`App.vue:158-160`(#121212)、`App.vue:283-286`(#1a1a2e)、`DocPreview.vue:1419`(#1d1e1f)、`Proof.vue:602-616`(#141414/#000000)、`Dictionary.vue:511-517` 与 `APISet.vue:458-471`(#000000) → 全部改用 tokens。（实施说明：#000000/#1a1a2e 等全部消灭，页面统一 `var(--bg-page)`=#121212、面板 `var(--bg-panel)`=#1d1e1f、卡片 `var(--bg-elevated)`=#1a1a1a、下沉区 `var(--bg-sunken)`=#141414；About/history 的 #000000 页背景同步收敛。）
+- [x] **修复暗色机制**：统一为 VueUse 的 `html.dark` 单一机制；删除 App.vue:2 手动 `:class="{dark:isDark}"`；修复死规则 `App.vue:174-176`（`.sidebar.dark` 的 class 实际绑在父级 `.app-layout` 上，暗色下侧栏仍是亮色 `#2c3a48`）→ 改 `html.dark .sidebar` 选择器。（实施说明：App.vue 手动绑定已删（先前的提交已把死规则修成 `.dark .sidebar`，本次再统一为 `html.dark .sidebar`）；全部组件内 `.dark ` 前缀（含 FormatClone 31 条）迁为 `html.dark `；common.css 的 `.dark` 全局规则同步改 `html.dark`。）
+- [x] **收敛全局补丁**：14 个文件各自携带的非 scoped `html.dark` 块（如 `PromptDisplay.vue:115-150`、`ConcurrencySettings.vue:111-139`、`ApiSelector.vue:247-279` 内容几乎相同）→ 公共部分合入 tokens.css / 公共工具类，组件内改 scoped。（实施说明：`setting-section/section-header/section-header .el-icon/tooltip-icon(:hover)/btn-subtle` 五组逐字重复的暗色规则收敛到 common.css 一次定义，从 10 个组件（7 个 api 组件 + PromptDisplay + PromptEditor + APISet/Dictionary 部分）中删除；组件内仅保留自身特有的暗色规则（非 scoped 块，改为全局选择器）。）
+- [x] **修复永久失效的样式**：`PromptEditor.vue:283-292` 在非 scoped 块使用 `:deep()`（仅 scoped 有效）→ 移入 scoped 块或改写为全局选择器。（实施说明：排查发现该问题不止 PromptEditor 一处——APISet(divider/tabs)、About(tabs/collapse)、history(表格)、Dictionary(表格)、AddApiDialog(对话框头尾)、ConcurrencySettings/RateLimitSettings(slider)、TokenStatistics(statistic) 的非 scoped `:deep()` 规则全部被浏览器整条丢弃、从未生效。统一改写为全局后代选择器，这批暗色样式首次真正生效，暗色回归时注意观感变化。）
+- [x] **滚动条策略统一**：取消明色下全局隐藏滚动条（`App.vue:301-303`、`Proof.vue:666-668`、`FormatClone.vue:1164-1177`），明暗均显示统一细滚动条。（实施说明：common.css 全局定义 8px 细滚动条（亮 #c9d2dc / 暗 #555），删除 App.vue 的 `::-webkit-scrollbar{display:none}` 与死 body 规则、Proof `.results-container` 与 FormatClone `.format-list/.defaults-section` 的隐藏规则；专用小滚动区（知识库下拉、引用列表等）原有的 5-6px 定制样式保留。）
+- [x] **（产品决策）暗色预览纸面模式**：`DocPreview.vue:1451-1496` 用 `!important` 把文档预览内容强改为深底浅字——校对软件应让用户看到「文档本来的样子」→ 默认恢复白底黑字（所见即所得），提供「预览适配暗色」开关，默认关。（实施说明：`fileInfoStore.previewDarkAdapt`（localStorage 持久化，默认 false）；暗色主题下顶栏出现「纸面适配暗色」开关（英文 Dark Paper），全部纸面规则（正文/表格/标题/引用/代码/链接/图片）门控在 `.preview-container.paper-dark-adapt` 前缀之下；`docx-wrapper` 灰底在暗色下无条件透明化以避免开关关闭时出现灰块。）
+- [x] **布局解耦**：`DocPreview.vue:1971` 的 `left:52px` 与 `App.vue:163` `.sidebar{width:52px}` 魔法数字 → 抽 `--sidebar-width` 变量两处共用；`padding-right:158px` 同理。（实施说明：tokens.css 定义 `--sidebar-width:52px` 与 `--titlebar-reserve:158px`，App 侧栏与 DocPreview action-bar 共用。）
 
 ### 验收标准
 
-- 明/暗两主题 × 7 个路由逐页目检：无背景断层、无亮色块、侧栏暗色正确、Element 组件暗色正常。
-- 暗色下文档预览默认为白底黑字，开关切换生效。
-- 明色下滚动条可见。
+- 明/暗两主题 × 7 个路由逐页目检：无背景断层、无亮色块、侧栏暗色正确、Element 组件暗色正常。（待人工回归；本次改动大量「从未生效」的暗色规则复活，重点看 APISet tabs、About tabs、history 表格、Dictionary 表格、AddApiDialog）
+- 暗色下文档预览默认为白底黑字，开关切换生效。（待人工回归）
+- 明色下滚动条可见。（待人工回归）
 
 ---
 
