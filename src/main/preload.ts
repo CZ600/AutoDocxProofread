@@ -169,8 +169,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setNewPrompt: (prompt: string) => ipcRenderer.invoke('setPrompt', prompt),
   // 获取所有历史记录
   deleteAllHistory: () => ipcRenderer.invoke('deleteAllHistory'),
-  // 获取所有历史记录
-  getAllHistory: () => ipcRenderer.invoke('getAllHistory'),
+  // 分页获取历史记录（keyword 模糊匹配 filePath/modelName）
+  getHistoryPage: (page: number, pageSize: number, keyword = '') =>
+    ipcRenderer.invoke('getHistoryPage', page, pageSize, keyword),
   // 获取指定id的历史记录
   getHistoryById: (id: number) => ipcRenderer.invoke('getHistoryById', id),
   // 删除指定id的历史记录,

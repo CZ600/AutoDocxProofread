@@ -173,7 +173,7 @@ export default interface ElectronApi {
   setNewPrompt: (newPrompt: string) => Promise<boolean>
 
   // 历史记录接口
-  getAllHistory: () => proofHistory[]
+  getHistoryPage: (page: number, pageSize: number, keyword?: string) => Promise<{ items: proofHistory[]; total: number }>
   deleteAllHistory: () => Promise<boolean>
   getHistoryById: (id: number) => Promise<proofHistory | null>
   deleteHistoryById: (id: number) => Promise<boolean>

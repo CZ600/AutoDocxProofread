@@ -722,14 +722,9 @@ export const registerIpcHandlers = () => {
       throw new Error('Please input a prompt!')
     }
   })
-  // 历史记录 - 获取全部的历史记录
-  ipcMain.handle('getAllHistory', async event => {
-    const result = await DB.getALLHistory()
-    if (result) {
-      return result
-    } else {
-      throw new Error('No history found!')
-    }
+  // 历史记录 - 分页查询（result 为完整 JSON，SQL 侧 LIMIT/OFFSET 避免全量返回）
+  ipcMain.handle('getHistoryPage', async (_event, page: number, pageSize: number, keyword = '') => {
+    return await DB.getHistoryPage(page, pageSize, keyword)
   })
   // 历史记录 - 删除全部的历史记录
   ipcMain.handle('deleteAllHistory', async event => {

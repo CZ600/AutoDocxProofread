@@ -248,13 +248,30 @@ export class DB {
     return rows.map(row => ({ ...row, apiKey: decryptApiKey(row.apiKey) }))
   }
 
-  static async getALLHistory(): Promise<proofHistory[]> {
-    // 获取所有校对记录
+  /**
+   * 分页查询校对历史（result 为完整 JSON，条数多时全量返回很重）。
+   * keyword 模糊匹配 filePath / modelName，与旧前端客户端搜索的字段一致。
+   */
+  static async getHistoryPage(
+    page: number,
+    pageSize: number,
+    keyword = ''
+  ): Promise<{ items: proofHistory[]; total: number }> {
     const db = await DB.getInstance()
-    const rows = await db.all<proofHistory[]>(
-      `SELECT id, filePath, apiURL, modelName, created_at, result FROM proof_history ORDER BY created_at DESC`
+    const trimmed = (keyword || '').trim()
+    const where = trimmed ? `WHERE filePath LIKE ? OR modelName LIKE ?` : ''
+    const params: any[] = trimmed ? [`%${trimmed}%`, `%${trimmed}%`] : []
+    const totalRow = await db.get(`SELECT COUNT(*) as count FROM proof_history ${where}`, ...params)
+    const items = await db.all<proofHistory[]>(
+      `SELECT id, filePath, apiURL, modelName, created_at, result
+       FROM proof_history ${where}
+       ORDER BY created_at DESC
+       LIMIT ? OFFSET ?`,
+      ...params,
+      pageSize,
+      Math.max(0, (page - 1) * pageSize)
     )
-    return rows
+    return { items, total: totalRow.count }
   }
 
   static async getAPISettings(): Promise<apiSettings | null> {

@@ -37,7 +37,7 @@
       </div>
     </div>
 
-    <el-table :data="pagedHistory" max-height="620" class="table" size="small">
+    <el-table :data="history" max-height="620" class="table" size="small">
       <!-- 有效信息优先：文件名 > 日期 > 模型 > 路径 -->
       <el-table-column :label="t('history.fileName')" min-width="180" show-overflow-tooltip>
         <template #default="scope">
@@ -66,11 +66,11 @@
       <el-pagination
         v-model:current-page="page"
         :page-size="pageSize"
-        :total="filteredHistory.length"
+        :total="total"
         layout="total, prev, pager, next"
-        :hide-on-single-page="filteredHistory.length <= pageSize"
+        :hide-on-single-page="total <= pageSize"
       />
-      <el-button size="small" :disabled="history.length === 0" class="btn-danger" @click="deleteAllHistory">
+      <el-button size="small" :disabled="total === 0" class="btn-danger" @click="deleteAllHistory">
         {{ t('history.deleteAll') }}
       </el-button>
     </div>
@@ -255,6 +255,7 @@ const electronAPI = window.electronAPI
 const fileStore = fileInfoStore()
 
 const history = ref<any[]>([])
+const total = ref(0)
 const searchText = ref('')
 const page = ref(1)
 const pageSize = 20
@@ -305,23 +306,33 @@ const loadCorrections = async (row: any): Promise<any[]> => {
   return corrections
 }
 
-// ---- 列表：搜索 + 分页 ----
-const filteredHistory = computed(() => {
-  const query = searchText.value.trim().toLowerCase()
-  if (!query) return history.value
-  return history.value.filter(
-    row =>
-      (row.filePath || '').toLowerCase().includes(query) ||
-      (row.modelName || '').toLowerCase().includes(query)
-  )
-})
-
-const pagedHistory = computed(() =>
-  filteredHistory.value.slice((page.value - 1) * pageSize, page.value * pageSize)
-)
+// ---- 列表：搜索 + 分页（SQL 侧 LIMIT/OFFSET，keyword 由主进程 LIKE 匹配 filePath/modelName）----
+const loadHistory = async () => {
+  try {
+    const { items, total: totalCount } = await electronAPI.getHistoryPage(page.value, pageSize, searchText.value)
+    history.value = items
+    total.value = totalCount
+    // 删除/搜索变更后当前页可能已超出总页数：回到第 1 页重新查询
+    if (page.value > 1 && items.length === 0) {
+      page.value = 1
+    }
+  } catch (error) {
+    console.error('获取历史记录失败:', error)
+    ElMessage.error(t('history.getHistoryFailed'))
+  }
+}
 
 watch(searchText, () => {
-  page.value = 1
+  if (page.value !== 1) {
+    // 置回第 1 页，由 page 的侦听触发重新查询，避免双份请求
+    page.value = 1
+  } else {
+    loadHistory()
+  }
+})
+
+watch(page, () => {
+  loadHistory()
 })
 
 // ---- 详情 ----
@@ -499,19 +510,6 @@ const deleteHistory = async (id: number) => {
   } catch (error) {
     console.error('删除历史记录失败:', error)
     ElMessage.error(t('history.deleteFailed'))
-  }
-}
-
-const loadHistory = async () => {
-  try {
-    const result = await electronAPI.getAllHistory()
-    history.value = result
-    if (page.value > 1 && filteredHistory.value.length <= (page.value - 1) * pageSize) {
-      page.value = 1
-    }
-  } catch (error) {
-    console.error('获取历史记录失败:', error)
-    ElMessage.error(t('history.getHistoryFailed'))
   }
 }
 
