@@ -445,7 +445,7 @@
       "devPlanL2": "Enhance user interface interaction experience (ongoing)",
       "devPlanL3": "Optimize .docx file processing algorithms (completed)",
       "version": "Version Info",
-      "currentVersion": "Current version: v1.1.9",
+      "currentVersion": "Current version: v1.3.0",
       "versionNote": "v1.1.9 has been released and can be downloaded from the project page",
       "changelog": "Changelog",
       "changelog1": "Updated AI format parsing and adjustment (smart format matching)",

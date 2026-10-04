@@ -54,6 +54,10 @@ This application also allows browsing and managing proofreading history:
 
 ![History Interface](docs/历史记录.png)
 
+Local knowledge base page, where you can create and manage multiple knowledge bases and import reference materials; check them during proofreading to let the model retrieve relevant context:
+
+![Local Knowledge Base](docs/本地知识库.png)
+
 Dark Mode:
 ![Dark Mode](docs/深色模式.png)
 
@@ -97,11 +101,13 @@ Dark Mode:
   - Adjustable correction parameters to adapt to different task scenarios
   - Recent files list for quickly reopening previously proofread documents
   - Streaming proofreading output with cancellation at any time; suggestions can be ignored or edited manually
+  - Dark/light theme toggle plus five light theme skins (Sky / Sakura / Mint / Dusk / Lemon); the document preview paper tone in dark mode is optional, defaulting to WYSIWYG
 
 - **Convenient API Configuration Management**:
   - Compatible with OpenAI interfaces, supporting various large language model APIs
-  - Flexible API configuration management
+  - Flexible API configuration management with API keys encrypted at rest
   - Support for setting concurrency count and request speed
+  - Deep-thinking (reasoning) model support: chain-of-thought content streams in real time during proofreading, with a one-click toggle
 
 - **Clear History Management**:
   - Clearly view historical records including time, proofreading model, proofread file path, and specific results
@@ -165,6 +171,16 @@ First-time use requires configuring a supported large language model API:
 
 ### Changelog
 
+- v1.3.0
+  - Added deep-thinking (reasoning) model support: compatible with DeepSeek, Doubao, GLM, etc.; chain-of-thought content streams in real time in the progress area, with a one-click toggle
+  - Added five light theme skins (Sky / Sakura / Mint / Dusk / Lemon); the document preview paper tone in dark mode is now optional, defaulting to WYSIWYG
+  - Proofreading granularity is now determined automatically by the proofreading type (word errors = by sentence, comprehensive errors = by paragraph, polish / reduce-AI = whole text), no separate selection needed
+  - "Review Results" now has an explicit toggle for easier token cost control; applied suggestions show a green check mark
+  - Improved knowledge base experience; multiple knowledge bases can be selected simultaneously during proofreading
+  - UI overhaul: card-based redesign of the feature/API settings pages, persistent explanations replaced by hover tooltips, action buttons right-aligned
+  - Performance: proofreading results update in place on click (no more full re-render), paginated history queries, lazy-loaded routes and split bundles for faster startup
+  - Security & observability: API keys encrypted at rest and redacted in logs; new runtime log with 2MB rotation for easier troubleshooting
+  - Stability fixes: LLM timeout and failed-slice visibility, knowledge base transaction fixes, async conversion of synchronous main-process IO, and a further reduced installer size
 - v1.2.3
   - Streaming proofreading output: proofreading progress and generated suggestions are displayed in real time, making long-document proofreading visible
   - Added mid-proofreading cancellation, so you no longer have to wait for the whole document to finish
@@ -257,7 +273,7 @@ npm install
 ### Run in Development Mode
 
 ```bash
-npm run start
+npm run dev
 ```
 
 
