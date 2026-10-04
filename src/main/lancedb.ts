@@ -89,15 +89,16 @@ function quoteIdent(name: string): string {
 }
 
 /**
- * 生成唯一 ID。
- * 注意：sqlite-vec 的 vec0 主键列是 32 位整数（i32），上限 2147483647，
+ * 生成表内自增 ID。
+ * sqlite-vec 的 vec0 主键列是 32 位整数（i32），上限 2147483647，
  * 超出会报 "Only integers are allowed for primary key values"。
- * 原 LanceDB 版用 Date.now()*1000 会立刻溢出 i32，故这里改为
- * 在 i32 安全范围内的随机数（2e9，留出余量），碰撞概率极低。
+ * 原实现为 i32 范围内的随机数，存在理论碰撞风险；改为表内 max(id)+1 自增，
+ * 对既有随机 ID 的旧库同样安全（新 ID 必然大于所有现存 ID）。
+ * 单连接串行写入（pdfUtils 逐 chunk 串行入库），无并发竞争窗口。
  */
-const VEC0_MAX_ID = 2000000000
-function generateId(): number {
-  return Math.floor(Math.random() * VEC0_MAX_ID)
+async function nextId(tableName: string): Promise<number> {
+  const row = await db!.get(`SELECT COALESCE(MAX(id), 0) + 1 AS next FROM ${quoteIdent(tableName)}`)
+  return row.next
 }
 
 /** 单引号转义，防止 metadata JSON 中的引号破坏 SQL */
@@ -359,7 +360,7 @@ export async function insertDocument(
     }
 
     const embedding = await embedSingle(text, modelName, apiKey, apiURL)
-    const id = generateId()
+    const id = await nextId(tableName)
     const metaJson = JSON.stringify(metadata)
 
     await db!.run(
@@ -512,12 +513,25 @@ export async function updateDocument(
     const existing = await db!.get(`SELECT id FROM ${quoteIdent(tableName)} WHERE id = ?`, id)
     if (!existing) throw new Error(`Document with id ${id} not found`)
 
-    // vec0 虚拟表不支持 UPDATE 修改向量列，需 DELETE + INSERT
-    await db!.run(`DELETE FROM ${quoteIdent(tableName)} WHERE id = ?`, id)
-    await db!.run(
-      `INSERT INTO ${quoteIdent(tableName)} (id, text, filename, embedding, metadata) VALUES (?, ?, ?, ?, ?)`,
-      id, newText, '', vectorToSql(embedding), JSON.stringify(newMeta)
-    )
+    // vec0 虚拟表不支持 UPDATE 修改向量列，需 DELETE + INSERT。
+    // 两步包进事务保证原子性：DELETE 成功后 INSERT 失败时回滚，避免文档直接丢失
+    await db!.exec('BEGIN IMMEDIATE')
+    try {
+      await db!.run(`DELETE FROM ${quoteIdent(tableName)} WHERE id = ?`, id)
+      await db!.run(
+        `INSERT INTO ${quoteIdent(tableName)} (id, text, filename, embedding, metadata) VALUES (?, ?, ?, ?, ?)`,
+        id, newText, '', vectorToSql(embedding), JSON.stringify(newMeta)
+      )
+      await db!.exec('COMMIT')
+    } catch (txError) {
+      try {
+        await db!.exec('ROLLBACK')
+      } catch (rollbackError) {
+        // 回滚失败仅记录：以触发回滚的原事务错误为准向上抛
+        console.error('ROLLBACK failed:', rollbackError)
+      }
+      throw txError
+    }
 
     console.log(`✏️ Updated doc ${id} in ${repositoryName}`)
     return { id, text: newText, meta: newMeta }
