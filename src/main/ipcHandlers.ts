@@ -388,11 +388,14 @@ export const registerIpcHandlers = () => {
             message: 'Please provide an API URL for this provider!'
           }
         }
-        if (Model === 'wordError') {
+        // wordError / ComprehensiveError / polish 共用同一编排管线（仅粒度不同）：
+        // resolveProofMode 已内置各模式默认值与前端覆盖（polish 固定整篇）
+        if (Model === 'wordError' || Model === 'ComprehensiveError' || Model === 'polish') {
+          const resolvedMode = resolveProofMode(Model, proofMode)
           console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           const proofreadOutcome = await proofreadDocument(
             filePath,
-            resolveProofMode(Model, proofMode),
+            resolvedMode,
             api_info.apiKey,
             api_info.modelName,
             api_info.apiURL,
@@ -414,7 +417,7 @@ export const registerIpcHandlers = () => {
             const reviewApiInfo = await resolveReviewApiInfo(reviewModelId)
             sendProgress({
               stage: 'reviewing',
-              mode: 'sentence',
+              mode: resolvedMode,
               total: proofResult.length,
               completed: 0,
               percent: 95,
@@ -431,171 +434,7 @@ export const registerIpcHandlers = () => {
                 (completed, total) => {
                   sendProgress({
                     stage: 'reviewing',
-                    mode: 'sentence',
-                    total,
-                    completed,
-                    percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
-                    message: '正在审核校对结果'
-                  })
-                },
-                reviewApiInfo.provider,
-                streamSink,
-                cancelToken
-              )
-              proofResult = reviewedResult
-              token_usage += reviewTokens
-            } catch (reviewError) {
-              if (cancelToken.cancelled) throw reviewError
-              console.error('审核校对结果失败，保留未过滤结果继续:', reviewError)
-              failedSegments.push({
-                stage: 'review',
-                index: 0,
-                label: 'review',
-                message: reviewError instanceof Error ? reviewError.message : String(reviewError)
-              })
-            }
-          }
-          // 确保返回的数据是可克隆的
-          try {
-            const result = {
-              proofResult: JSON.parse(JSON.stringify(proofResult)),
-              token_usage: token_usage,
-              failedSegments
-            }
-            return result
-          } catch (error) {
-            console.error('序列化校对结果时出错:', error)
-            return {
-              proofResult: null,
-              token_usage: token_usage
-            }
-          }
-        } else if (Model === 'ComprehensiveError') {
-          console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
-          const proofreadOutcome = await proofreadDocument(
-            filePath,
-            resolveProofMode(Model, proofMode),
-            api_info.apiKey,
-            api_info.modelName,
-            api_info.apiURL,
-            repositoryNameList,
-            embeddingConfig,
-            parallelSet,
-            requestsPerMinute,
-            sendProgress,
-            api_info.provider,
-            streamSink,
-            cancelToken
-          )
-          let { proofResult, token_usage } = proofreadOutcome
-          const { failedSegments } = proofreadOutcome
-
-          // 自动审核校对结果：默认关闭，仅在显式选择审核模型或开启「结果复核」开关时执行。
-          // 审核失败不丢弃已完成的校对结果——保留未过滤结果并把失败记入 failedSegments。
-          if (proofResult && proofResult.length > 0 && shouldRunReview(reviewModelId, reviewEnabled)) {
-            const reviewApiInfo = await resolveReviewApiInfo(reviewModelId)
-            sendProgress({
-              stage: 'reviewing',
-              mode: 'section',
-              total: proofResult.length,
-              completed: 0,
-              percent: 95,
-              message: '正在审核校对结果'
-            })
-            try {
-              const backgroundInstruction = await getCurrentBackgroundInstruction()
-              const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
-                proofResult,
-                backgroundInstruction,
-                reviewApiInfo.apiKey,
-                reviewApiInfo.modelName,
-                reviewApiInfo.apiURL,
-                (completed, total) => {
-                  sendProgress({
-                    stage: 'reviewing',
-                    mode: 'section',
-                    total,
-                    completed,
-                    percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
-                    message: '正在审核校对结果'
-                  })
-                },
-                reviewApiInfo.provider,
-                streamSink,
-                cancelToken
-              )
-              proofResult = reviewedResult
-              token_usage += reviewTokens
-            } catch (reviewError) {
-              if (cancelToken.cancelled) throw reviewError
-              console.error('审核校对结果失败，保留未过滤结果继续:', reviewError)
-              failedSegments.push({
-                stage: 'review',
-                index: 0,
-                label: 'review',
-                message: reviewError instanceof Error ? reviewError.message : String(reviewError)
-              })
-            }
-          }
-          // 确保返回的数据是可克隆的
-          try {
-            const result = {
-              proofResult: JSON.parse(JSON.stringify(proofResult)),
-              token_usage: token_usage,
-              failedSegments
-            }
-            return result
-          } catch (error) {
-            console.error('序列化校对结果时出错:', error)
-            return {
-              proofResult: null,
-              token_usage: token_usage
-            }
-          }
-        } else if (Model === 'polish') {
-          console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
-          const proofreadOutcome = await proofreadDocument(
-            filePath,
-            'full',
-            api_info.apiKey,
-            api_info.modelName,
-            api_info.apiURL,
-            repositoryNameList,
-            embeddingConfig,
-            parallelSet,
-            requestsPerMinute,
-            sendProgress,
-            api_info.provider,
-            streamSink,
-            cancelToken
-          )
-          let { proofResult, token_usage } = proofreadOutcome
-          const { failedSegments } = proofreadOutcome
-
-          // 自动审核校对结果：默认关闭，仅在显式选择审核模型或开启「结果复核」开关时执行。
-          // 审核失败不丢弃已完成的校对结果——保留未过滤结果并把失败记入 failedSegments。
-          if (proofResult && proofResult.length > 0 && shouldRunReview(reviewModelId, reviewEnabled)) {
-            const reviewApiInfo = await resolveReviewApiInfo(reviewModelId)
-            sendProgress({
-              stage: 'reviewing',
-              mode: 'full',
-              total: proofResult.length,
-              completed: 0,
-              percent: 95,
-              message: '正在审核校对结果'
-            })
-            try {
-              const backgroundInstruction = await getCurrentBackgroundInstruction()
-              const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
-                proofResult,
-                backgroundInstruction,
-                reviewApiInfo.apiKey,
-                reviewApiInfo.modelName,
-                reviewApiInfo.apiURL,
-                (completed, total) => {
-                  sendProgress({
-                    stage: 'reviewing',
-                    mode: 'full',
+                    mode: resolvedMode,
                     total,
                     completed,
                     percent: total > 0 ? Math.min(100, 95 + Math.floor((completed / total) * 5)) : 95,
@@ -635,6 +474,7 @@ export const registerIpcHandlers = () => {
             }
           }
         } else if (Model === 'reduceAI') {
+
           console.log('will reduce AI detection rate by model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           const sendProgress = (payload: ProofreadProgressPayload) => {
             event.sender.send(PROOFREAD_PROGRESS_CHANNEL, payload)
