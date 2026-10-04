@@ -316,20 +316,31 @@
 
 ### 任务清单
 
-- [ ] **ipcHandlers 按域拆分**：`ipcHandlers.ts`（1198 行约 50 个 handler）拆为 window/dialog/apiSettings/proof/knowledge/format 六个注册模块（如 `ipc/proofHandlers.ts`），原文件仅做聚合注册。
-- [ ] **process-docx 三分支合并**：`ipcHandlers.ts:343-601` 中 wordError/ComprehensiveError/polish 约 90 行×3 的复制粘贴 → mode 参数 + 单条编排路径（批次 3 的 `shouldRunReview()` 已热身）。
-- [ ] **logger 落地**：`logger.ts` 的 writeLog 目前除定义外零调用 → 接入关键路径（校对开始/结束/失败、导出、知识库入库），按大小轮转；替换生产敏感/噪音 console（`proof.ts:1038/1240-1248/1588` 输出校对结果全文、`lancedb.ts:433-441` 输出 RAG chunk 全文）；渲染层在 `electron.vite.config.ts` 配 esbuild `drop:['console']`（保留 error 可改为 drop `console` 仅 info/log，按需权衡）。
-- [ ] **数据库健壮性**：`lancedb.ts:515-520` updateDocument 的 DELETE+INSERT 包进事务；`:98-101` 随机 i32 主键有碰撞风险 → 改自增或 uuid。
-- [ ] **同步 IO 异步化**：`proof.ts:291/306` prompt 设置读写 readFileSync/writeFileSync、`logger.ts:30` appendFileSync、`ipcHandlers.ts:770` copyFileSync → fs/promises。
-- [ ] **（可选）历史分页**：`database.ts:264-271` getAllHistory 全量返回（result 为完整 JSON）→ SQL 层 LIMIT/OFFSET + 总数字段，`history.vue` 已有分页 UI 可对接。
-- [ ] **（可选，大工程）CPU 卸载**：全项目无 worker_threads/utilityProcess，mammoth 的 docx→HTML、docx-edit 全文档解析、pdf-parse 抽取都在主进程跑 → 先用大文档 profile 确认瓶颈，再决定是否迁移到 utilityProcess。
-- [ ] **小修复顺带**：`database.ts:228-238` `deleteALLSettings` 用 SELECT 结果的 `.changes` 判断恒 undefined（逻辑错误，确认未被调用后修正或删除）。
+- [x] **ipcHandlers 按域拆分**：`ipcHandlers.ts`（1198 行约 50 个 handler）拆为 window/dialog/apiSettings/proof/knowledge/format 六个注册模块（如 `ipc/proofHandlers.ts`），原文件仅做聚合注册。
+- [x] **process-docx 三分支合并**：`ipcHandlers.ts:343-601` 中 wordError/ComprehensiveError/polish 约 90 行×3 的复制粘贴 → mode 参数 + 单条编排路径（批次 3 的 `shouldRunReview()` 已热身）。
+- [x] **logger 落地**：`logger.ts` 的 writeLog 目前除定义外零调用 → 接入关键路径（校对开始/结束/失败、导出、知识库入库），按大小轮转；替换生产敏感/噪音 console（`proof.ts:1038/1240-1248/1588` 输出校对结果全文、`lancedb.ts:433-441` 输出 RAG chunk 全文）；渲染层在 `electron.vite.config.ts` 配 esbuild `drop:['console']`（保留 error 可改为 drop `console` 仅 info/log，按需权衡）。
+- [x] **数据库健壮性**：`lancedb.ts:515-520` updateDocument 的 DELETE+INSERT 包进事务；`:98-101` 随机 i32 主键有碰撞风险 → 改自增或 uuid。
+- [x] **同步 IO 异步化**：`proof.ts:291/306` prompt 设置读写 readFileSync/writeFileSync、`logger.ts:30` appendFileSync、`ipcHandlers.ts:770` copyFileSync → fs/promises。
+- [x] **（可选）历史分页**：`database.ts:264-271` getAllHistory 全量返回（result 为完整 JSON）→ SQL 层 LIMIT/OFFSET + 总数字段，`history.vue` 已有分页 UI 可对接。
+- [ ] **（可选，大工程）CPU 卸载**：全项目无 worker_threads/utilityProcess，mammoth 的 docx→HTML、docx-edit 全文档解析、pdf-parse 抽取都在主进程跑 → 先用大文档 profile 确认瓶颈，再决定是否迁移到 utilityProcess。（**按用户决策跳过**：2026-10-04 实施批次 10 时明确不做此项，留待大文档 profile 有结论后再议。）
+- [x] **小修复顺带**：`database.ts:228-238` `deleteALLSettings` 用 SELECT 结果的 `.changes` 判断恒 undefined（逻辑错误，确认未被调用后修正或删除）。
+
+**实施说明（2026-10-04）**：
+- **lancedb.ts 澄清**（实施前用户问询）：该文件不是死代码——向量存储已从 @lancedb/lancedb（109MB 原生库）迁移到 sqlite-vec（289KB vec0.dll），迁移策略是「保持原导出函数签名不变、调用方零改动」，文件名沿用为历史遗留。计划中「主键改自增或 uuid」的 uuid 方案不可行（vec0 虚拟表主键约束为 i32），改为表内 `max(id)+1` 自增——对旧库遗留的随机 ID 同样安全（新 ID 必然大于所有现存 ID），单连接串行写入无竞争窗口。updateDocument 的事务用 `BEGIN IMMEDIATE/COMMIT/ROLLBACK` 包裹，embedding 计算保持在事务外。
+- **拆分结构**：新增 `src/main/ipc/` 六模块（windowHandlers 7 / dialogHandlers 5 / apiSettingsHandlers 10 / proofHandlers 15 / knowledgeHandlers 15 / formatHandlers 8）+ `apiState.ts` 承载跨域共享状态（api_info / proxy_settings / resolveReviewApiInfo）；`ipcHandlers.ts` 收敛为聚合注册入口（约 40 行）并 re-export `apiSettings/ProxySettings` 类型（electron.d.ts 消费）。**handler 数量守恒验证：拆分前后均 60**（`ipcMain.handle`+`ipcMain.on` grep 计数）。拆分顺带清掉行内 require（os/path/fs 改顶层导入），src 全量 eslint error 41 → 31（零新增，存量均为历史遗留类别：pdfUtils 正则转义、docx-edit 无类型包 require 惯例等）。
+- **process-docx 合并**：三分支收敛为 `wordError || ComprehensiveError || polish` 单条编排（约 -180 行，ipcHandlers 拆分前 1272 → 1117 行）；`resolveProofMode(Model, proofMode)` 统一给粒度，审核进度 payload 的 mode 由各分支硬编码字面量改为解析后的实际粒度（proofMode 覆盖时进度显示更准确，仅展示字段、无逻辑影响）；reduceAI 管线独立保留。
+- **logger**：重写为异步队列写入（串行保序、单条失败不中断队列）+ 2MB 轮转（main.log → main.log.1）+ info/warn/error 级别；接入 proofreadDocument/reduceAIDetectionDocument（包装层统一记 start/done/failed/cancelled，含空文档早退路径）、exportCorrectedDocx（applied/unmatched）、processDocument 入库（start/done chunks+耗时）、process-docx ipc 失败。全文日志清除：proof.ts 分片正文、lancedb.ts 查询文本与 RAG chunk 全文（改为长度/条数/分数摘要）。渲染层 `esbuild.pure: ['console.log','console.info','console.debug']`——**注意**：electron-vite 默认关闭压缩，pure 标记需压缩器才会删除，当前产物仍残留 5 处语句位置的 console.log（APISet 2 + index 3）；若要彻底清除可开启 renderer `build.minify`（顺带可减包体约 40%），属独立决策未纳入本批次。未用 `drop:['console']` 是为保留 45 处 console.error/warn 排障能力。
+- **同步 IO**：proof.ts 提示词懒加载改异步单飞（`ensurePromptSettingsLoaded` 加载中并发调用共享同一 Promise，ENOENT 静默回落默认）；校对主路径 `proofreadDocument` 内 `getCurrentEffectivePrompt()` 与 `getCurrentBackgroundInstruction()` 转 async（导出签名变化：后者 sync → async，调用方 ipcHandlers 均 await）。logger appendFileSync 随重写异步化；export-format-cloned 的 copyFileSync → `fs.promises.copyFile`。
+- **历史分页**：新增 `DB.getHistoryPage(page, pageSize, keyword)`（LIKE 模糊匹配 filePath/modelName，与旧前端客户端搜索字段一致）+ `getHistoryPage` IPC 全链路（preload/d.ts/history.vue）；history.vue 从「全量加载 + 前端过滤分页」切到「SQL 分页 + 服务端搜索」（searchText/page 各自 watch 防双份请求，删除后当前页越界自动回第 1 页）；全量 `getAllHistory` 链路（handler/preload/d.ts/DB.getALLHistory）随之移除。
+- **顺带删除**：`deleteALLSettings`（零调用，SELECT 结果无 `.changes` 字段逻辑恒错）。
+- 验证：`npm test` 144 通过 / 20 失败（失败集合与基线完全一致，均为既有真实 LLM 集成用例）；`npm run build` 绿；`npm run build:win` 打包成功。
+- 待人工回归：校对四模式全流程（含审核开关、取消、流式）、降AI率、导出修正文档（applied/unmatched 提示）、知识库建库/入库（新库自增 ID）/检索/删除、格式克隆全流程、历史页分页与搜索（大库下打开速度）、提示词设置保存与重启回读、代理设置、明暗两主题冒烟。
 
 ### 验收标准
 
-- 拆分后 handler 总数守恒（聚合注册前后各 grep 一次 `ipcMain.handle` 计数）。
-- 日志文件正常生成、按大小轮转，且不含明文 key、不含校对结果全文。
-- 全功能回归 + 大文档（含历史记录较多时）历史页打开速度可感知提升。
+- 拆分后 handler 总数守恒（聚合注册前后各 grep 一次 `ipcMain.handle` 计数）。（✅ 60 = 60）
+- 日志文件正常生成、按大小轮转，且不含明文 key、不含校对结果全文。（✅ 接线完成，全文输出已改摘要；运行时表现待人工确认）
+- 全功能回归 + 大文档（含历史记录较多时）历史页打开速度可感知提升。（分页已就位，待人工对比）
 
 ---
 
