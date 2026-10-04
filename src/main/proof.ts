@@ -6,6 +6,7 @@ import path from 'path'
 import { app } from 'electron'
 import { queryDocuments } from './lancedb'
 import { maskKey } from './apiKeyCrypto'
+import { writeLog } from './logger'
 import { error } from 'console'
 import { ProofreadProgressPayload, ProofreadStreamPayload, ProofreadStreamStage } from '../shared/proofreadProgress'
 import {
@@ -1302,8 +1303,8 @@ async function proofreadTextWithRAG(
 
     // 如果没有提供 repositoryNameList 或者为空数组，使用正常校对
     if (!repositoryNameList || repositoryNameList.length === 0) {
-      console.log('use normal proof without rag:')
-      console.log('proof content:', textForLLM)
+      // 分片全文不落日志，只记长度（避免用户文档内容进日志文件）
+      writeLog(`[proofread] segment without RAG: chars=${textForLLM.length}`)
       const { result, total_tokens } = await callModelAPI(
         systemPrompt,
         `${getLocalizedUserPromptText()}:\n${textForLLM}`,
@@ -1386,7 +1387,63 @@ function toFailureMessage(error: unknown): string {
   return String(error)
 }
 
+/**
+ * 校对入口（日志包装层）：开始/完成/失败/取消统一落盘 logger，
+ * 具体流程见 proofreadDocumentImpl。包装保证所有出口（含空文档早退）都有完成记录。
+ */
 export async function proofreadDocument(
+  documentPath: string,
+  mode: 'section' | 'sentence' | 'full',
+  apiKey: string,
+  modelName: string,
+  apiURL: string,
+  repositoryNameList?: string[],
+  embeddingConfig?: ApiSettings,
+  parallelSet = 30,
+  requestsPerMinute?: number,
+  onProgress?: (payload: ProofreadProgressPayload) => void,
+  provider?: ModelProvider,
+  streamSink?: ProofreadStreamSink | null,
+  cancelToken?: ProofreadCancelToken | null
+): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number; failedSegments: FailedSegment[] }> {
+  const startedAt = Date.now()
+  writeLog(
+    `[proofread] start: mode=${mode}, file=${path.basename(documentPath)}, parallel=${parallelSet}, rpm=${requestsPerMinute ?? 'unlimited'}`
+  )
+  try {
+    const outcome = await proofreadDocumentImpl(
+      documentPath,
+      mode,
+      apiKey,
+      modelName,
+      apiURL,
+      repositoryNameList,
+      embeddingConfig,
+      parallelSet,
+      requestsPerMinute,
+      onProgress,
+      provider,
+      streamSink,
+      cancelToken
+    )
+    writeLog(
+      `[proofread] done: mode=${mode}, suggestions=${outcome.proofResult?.length ?? 0}, tokens=${outcome.token_usage}, failedSegments=${outcome.failedSegments.length}, elapsed=${Date.now() - startedAt}ms`
+    )
+    return outcome
+  } catch (error) {
+    if (cancelToken?.cancelled) {
+      writeLog(`[proofread] cancelled: mode=${mode}, file=${path.basename(documentPath)}, elapsed=${Date.now() - startedAt}ms`, 'warn')
+    } else {
+      writeLog(
+        `[proofread] failed: mode=${mode}, file=${path.basename(documentPath)}, error=${error instanceof Error ? error.message : String(error)}`,
+        'error'
+      )
+    }
+    throw error
+  }
+}
+
+async function proofreadDocumentImpl(
   documentPath: string,
   mode: 'section' | 'sentence' | 'full',
   apiKey: string,
@@ -1765,7 +1822,49 @@ function cleanAIResponse(text: string): string {
   return cleaned.trim()
 }
 
+/** 降AI率入口（日志包装层），流程见 reduceAIDetectionDocumentImpl */
 export async function reduceAIDetectionDocument(
+  documentPath: string,
+  apiKey: string,
+  modelName: string,
+  apiURL: string,
+  parallelSet = 30,
+  requestsPerMinute?: number,
+  onProgress?: (payload: ProofreadProgressPayload) => void,
+  provider?: ModelProvider,
+  streamSink?: ProofreadStreamSink | null,
+  cancelToken?: ProofreadCancelToken | null
+): Promise<{ proofResult: ProofreadingCorrection[]; token_usage: number; failedSegments: FailedSegment[] }> {
+  const startedAt = Date.now()
+  writeLog(`[reduceAI] start: file=${path.basename(documentPath)}, parallel=${parallelSet}, rpm=${requestsPerMinute ?? 'unlimited'}`)
+  try {
+    const outcome = await reduceAIDetectionDocumentImpl(
+      documentPath,
+      apiKey,
+      modelName,
+      apiURL,
+      parallelSet,
+      requestsPerMinute,
+      onProgress,
+      provider,
+      streamSink,
+      cancelToken
+    )
+    writeLog(
+      `[reduceAI] done: suggestions=${outcome.proofResult?.length ?? 0}, tokens=${outcome.token_usage}, failedSegments=${outcome.failedSegments.length}, elapsed=${Date.now() - startedAt}ms`
+    )
+    return outcome
+  } catch (error) {
+    if (cancelToken?.cancelled) {
+      writeLog(`[reduceAI] cancelled: file=${path.basename(documentPath)}, elapsed=${Date.now() - startedAt}ms`, 'warn')
+    } else {
+      writeLog(`[reduceAI] failed: file=${path.basename(documentPath)}, error=${error instanceof Error ? error.message : String(error)}`, 'error')
+    }
+    throw error
+  }
+}
+
+async function reduceAIDetectionDocumentImpl(
   documentPath: string,
   apiKey: string,
   modelName: string,

@@ -30,6 +30,7 @@ import { Database, open } from 'sqlite'
 import sqlite3 from 'sqlite3'
 import { getEmbedding } from './chat'
 import { loadVecExtension } from './sqliteVec'
+import { writeLog } from './logger'
 
 // vec0 扩展是否已加载（单连接上只需加载一次）
 let vecLoaded = false
@@ -402,7 +403,6 @@ export async function queryDocuments(
     }
 
     const embedding = await embedSingle(queryText, modelName, apiKey, apiURL)
-    console.log('qureyText:', queryText)
 
     // vec0 KNN 语法：WHERE embedding MATCH ? AND k = ? [AND 额外列过滤]
     let whereExtra = ''
@@ -431,15 +431,8 @@ export async function queryDocuments(
       score: r.distance,
       meta: r.metadata ? JSON.parse(r.metadata) : {}
     }))
-    resultMap.forEach((element: any) => {
-      console.log('the query result text:', element.text)
-      console.log('the query result score:', element.score)
-    })
-    console.log(`🔍 RAG查询详情:
-  仓库: ${repositoryName}
-  查询文本: ${queryText.substring(0, 50)}...
-  返回结果数: ${rows.length}
-  首条结果分数: ${rows[0]?.distance}`)
+    // chunk 全文不落日志（用户文档内容），只记检索摘要
+    writeLog(`[rag] query: repo=${repositoryName}, chars=${queryText.length}, results=${rows.length}, topScore=${rows[0]?.distance}`)
     return resultMap
   } catch (error: any) {
     console.error('Failed to query documents:', error)

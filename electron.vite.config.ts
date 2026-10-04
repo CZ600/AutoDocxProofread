@@ -32,6 +32,11 @@ export default defineConfig({
     // 入口 HTML 在项目根目录 index.html，而非默认的 src/renderer/index.html，需把 root 指向项目根
     root: resolve(__dirname),
     base: './',
+    esbuild: {
+      // 生产渲染层移除普通日志调用（连同参数整体消除），保留 warn/error 便于排障。
+      // 用 pure 而非 drop:['console']：后者连 console.error 一起去掉
+      pure: ['console.log', 'console.info', 'console.debug']
+    },
     build: {
       rollupOptions: {
         input: {

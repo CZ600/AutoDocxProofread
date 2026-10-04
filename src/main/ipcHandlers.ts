@@ -4,6 +4,7 @@ import * as path from 'path'
 import fs from 'fs'
 import { DB } from './database'
 import { maskKey } from './apiKeyCrypto'
+import { writeLog } from './logger'
 import { testAPI, testAPIWithProvider, setRequestTimeoutMs, setThinkingMode, ChatThinkingMode } from './chat'
 import { shouldRunReview } from './reviewGate'
 import { ModelProvider, getProviderBaseURL, requiresBaseURL } from '../shared/modelProviders'
@@ -667,6 +668,9 @@ export const registerIpcHandlers = () => {
         }
       } catch (error) {
         console.error('处理文档校对请求时出错:', error)
+        if (!cancelToken.cancelled) {
+          writeLog(`[proofread] ipc failed: model=${Model}, error=${error instanceof Error ? error.message : String(error)}`, 'error')
+        }
         // 用户主动取消：不是错误，返回 cancelled 标记让前端走取消流程
         if (cancelToken.cancelled) {
           return {
@@ -754,6 +758,7 @@ export const registerIpcHandlers = () => {
       }
 
       const replaceResult = await replaceTextInDocx(filePath, saveResult.filePath, correctedText)
+      writeLog(`[export] corrected docx: applied=${replaceResult.appliedCount}, unmatched=${replaceResult.unmatchedCount}, file=${saveResult.filePath}`)
       return {
         success: true,
         canceled: false,

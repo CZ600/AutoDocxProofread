@@ -3,6 +3,7 @@ import path from 'path'
 import { promisify } from 'node:util'
 import { readFile } from 'node:fs/promises'
 import { insertDocument, getOrCreateTable, initLanceDB } from './lancedb'
+import { writeLog } from './logger'
 
 // 使用动态导入方式导入 uuid
 let uuidv4: any
@@ -395,6 +396,8 @@ export async function processDocument(
   if (!documentId) {
     documentId = v4()
   }
+  const ingestStartedAt = Date.now()
+  writeLog(`[kb-ingest] start: repo=${repositoryName}, file=${path.basename(filePath)}`)
 
   // 1. 提取文本根据文件类型
   const ext = path.extname(filePath).toLowerCase()
@@ -454,6 +457,8 @@ export async function processDocument(
 
     results.push(result)
   }
+
+  writeLog(`[kb-ingest] done: repo=${repositoryName}, file=${fileName}, chunks=${chunks.length}, elapsed=${Date.now() - ingestStartedAt}ms`)
 
   return {
     documentId,
