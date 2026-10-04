@@ -86,20 +86,6 @@
               <el-option :label="t('proof.modeReduceAI')" value="reduceAI" />
             </el-select>
 
-            <!-- 校对粒度：仅拆分式校对类型可选（polish/reduceAI 固定整篇处理） -->
-            <el-select
-              v-if="form.model === 'wordError' || form.model === 'ComprehensiveError'"
-              v-model="form.proofMode"
-              :placeholder="t('proof.proofMode.label')"
-              size="default"
-              class="proofmode-select bar-select"
-            >
-              <el-option :label="t('proof.proofMode.auto')" value="" />
-              <el-option :label="t('proof.proofMode.full')" value="full" />
-              <el-option :label="t('proof.proofMode.section')" value="section" />
-              <el-option :label="t('proof.proofMode.sentence')" value="sentence" />
-            </el-select>
-
             <KbSelector v-model="selectedRepositories" />
 
             <el-button
@@ -224,9 +210,7 @@ const proofreadingResults = computed({
 })
 const form = ref({
   model: fileStore.proofModel,
-  filePath: fileStore.filePath,
-  // 校对粒度：'' = 默认（wordError 按句、综合按段）；仅 wordError/ComprehensiveError 可调
-  proofMode: ''
+  filePath: fileStore.filePath
 })
 
 // 知识库选择器已拆为 KbSelector.vue（选中列表经 v-model 回传，校对提交时使用）
@@ -499,7 +483,6 @@ const onSubmit = async () => {
       apiSettingsStore.selectedApi.parallel,
       apiSettingsStore.reviewModelId ?? null,
       currentRunId,
-      form.value.proofMode || undefined,
       apiSettingsStore.reviewEnabled === true
     )
     // 用户取消：主进程中止了在途请求，走取消流程而非报错

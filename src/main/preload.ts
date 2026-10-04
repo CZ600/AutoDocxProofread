@@ -83,7 +83,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     parallelSet?: number,
     reviewModelId?: number | null,
     runId?: string,
-    proofMode?: string,
     reviewEnabled?: boolean
   ) => {
     // 确保传递的参数是可序列化的
@@ -96,7 +95,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       parallelSet: parallelSet || 30,
       reviewModelId: reviewModelId ?? null,
       runId: runId || undefined,
-      proofMode: proofMode || undefined,
       reviewEnabled: reviewEnabled === true
     }
 
@@ -110,7 +108,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       serializableParams.parallelSet,
       serializableParams.reviewModelId,
       serializableParams.runId,
-      serializableParams.proofMode,
       serializableParams.reviewEnabled
     )
   },

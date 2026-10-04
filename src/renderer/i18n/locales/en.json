@@ -178,13 +178,6 @@
       "segmentClean": "Done, no changes",
       "thinking": "Thinking",
       "noThinking": "Thinking enabled, but no reasoning received (model/provider may not support it)"
-    },
-    "proofMode": {
-      "label": "Granularity",
-      "auto": "Default",
-      "full": "Whole document",
-      "section": "By section",
-      "sentence": "By sentence"
     }
   },
   "apiSettings": {

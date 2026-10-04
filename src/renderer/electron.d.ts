@@ -146,7 +146,6 @@ export default interface ElectronApi {
     parallelSet?: number,
     reviewModelId?: number | null,
     runId?: string,
-    proofMode?: string,
     reviewEnabled?: boolean
   ) => Promise<{
     proofResult: ProofreadingCorrection[]

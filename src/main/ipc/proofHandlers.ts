@@ -36,15 +36,10 @@ const PROOFREAD_STREAM_CHANNEL = 'proofread-stream'
 // 渲染端发起校对时生成 runId 一并传入，取消时按 runId 精确中止对应任务
 const activeProofreadTokens = new Map<string, ProofreadCancelToken>()
 
-// 校对粒度可选值与解析规则：
-// polish/reduceAI 固定整篇处理；其余类型默认 wordError=按句、ComprehensiveError=按段，
-// 前端可通过 proofMode 参数覆盖（此前该能力在共享层定义了却无任何入口）
-const PROOF_MODES: ProofreadMode[] = ['full', 'section', 'sentence']
-const resolveProofMode = (model: string, requested?: string): ProofreadMode => {
+// 校对粒度解析规则：polish/reduceAI 固定整篇处理；
+// wordError=按句、ComprehensiveError=按段（粒度由校对类型唯一决定，无独立覆盖入口）
+const resolveProofMode = (model: string): ProofreadMode => {
   if (model === 'polish' || model === 'reduceAI') return 'full'
-  if (requested && PROOF_MODES.includes(requested as ProofreadMode)) {
-    return requested as ProofreadMode
-  }
   return model === 'ComprehensiveError' ? 'section' : 'sentence'
 }
 
@@ -77,7 +72,6 @@ export const registerProofHandlers = () => {
       parallelSet = 30,
       reviewModelId?: number | null,
       runId?: string,
-      proofMode?: string,
       reviewEnabled?: boolean
     ) => {
       // 流式输出：LLM 增量文本与分段完成事件经独立通道推送渲染端。
@@ -135,9 +129,9 @@ export const registerProofHandlers = () => {
           }
         }
         // wordError / ComprehensiveError / polish 共用同一编排管线（仅粒度不同）：
-        // resolveProofMode 已内置各模式默认值与前端覆盖（polish 固定整篇）
+        // 粒度由校对类型唯一决定（wordError=按句、ComprehensiveError=按段、polish=整篇）
         if (Model === 'wordError' || Model === 'ComprehensiveError' || Model === 'polish') {
-          const resolvedMode = resolveProofMode(Model, proofMode)
+          const resolvedMode = resolveProofMode(Model)
           console.log('will process by the model:', maskKey(api_info.apiKey), api_info.apiURL, api_info.modelName)
           const proofreadOutcome = await proofreadDocument(
             filePath,

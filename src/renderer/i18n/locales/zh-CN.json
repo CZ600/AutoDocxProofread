@@ -178,13 +178,6 @@
       "segmentClean": "完成，无修改",
       "thinking": "思考中",
       "noThinking": "已开启思考，但未收到思维链（当前模型或服务可能不支持）"
-    },
-    "proofMode": {
-      "label": "校对粒度",
-      "auto": "默认",
-      "full": "整篇",
-      "section": "分段",
-      "sentence": "逐句"
     }
   },
   "apiSettings": {
