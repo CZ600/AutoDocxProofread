@@ -490,6 +490,8 @@ onMounted(async () => {
 
 .button-group {
   display: flex;
+  /* 恢复默认按钮靠右，与设置页其余操作条（保存/撤销）的动线一致 */
+  justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
   flex-wrap: wrap;

@@ -164,7 +164,8 @@ const handleReset = async () => {
 
 .radio-group {
   display: flex;
-  flex-wrap: wrap;
+  /* 强度/背景各档始终单行排列：窄窗口下靠压缩档内留白适配，不换行 */
+  flex-wrap: nowrap;
   gap: 0;
 }
 
@@ -179,6 +180,9 @@ const handleReset = async () => {
   font-weight: 500;
   box-shadow: none;
   transition: all 0.2s ease;
+  /* 压缩横向内边距并微缩字号：三档强度（约23个全角字符）在窄窗口下也能排进一行 */
+  padding: 8px 10px;
+  font-size: 13px;
 }
 
 .radio-group :deep(.el-radio-button__inner:hover) {
@@ -223,17 +227,21 @@ const handleReset = async () => {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
 }
 
-/* 操作条：右对齐贴卡片底部，与设置页「保存即所得」的动线一致 */
+/* 操作条：右对齐贴卡片底部，与设置页「保存即所得」的动线一致；
+   三枚按钮不换行，窄窗口下靠压缩间距/内边距保持一行 */
 .button-group {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 8px;
   margin-top: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
+/* 压缩字号与内边距并放开最小宽度：三枚操作按钮在约 1/3 窗口宽的设置列内也保持一行 */
 .btn-save {
-  min-width: 140px;
+  min-width: 100px;
+  font-size: 13px;
+  padding: 8px 10px;
   background-color: var(--brand);
   border-color: var(--brand);
   color: #ffffff;
@@ -245,7 +253,8 @@ const handleReset = async () => {
 }
 
 .btn-subtle {
-  min-width: 100px;
+  font-size: 13px;
+  padding: 8px 10px;
   color: #6d8299;
   border-color: #d5dde5;
   background: #ffffff;
@@ -255,6 +264,19 @@ const handleReset = async () => {
   color: #4a6580;
   border-color: #b8c7d4;
   background: #f4f6f9;
+}
+
+/* 设置列与文档预览面板 1:2 分栏，卡片内容区约为窗口宽度的 1/3 再减 76px：
+   窗口不足约 1400px 时内容区放不下常规尺寸，降一档内边距推迟溢出 */
+@media (max-width: 1400px) {
+  .radio-group :deep(.el-radio-button__inner) {
+    padding: 8px 6px;
+  }
+
+  .button-group .btn-save,
+  .button-group .btn-subtle {
+    padding: 8px 8px;
+  }
 }
 
 @media (max-width: 768px) {

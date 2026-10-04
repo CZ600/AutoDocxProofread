@@ -11,14 +11,6 @@
         </el-tooltip>
       </div>
       <div class="setting-body">
-        <el-button
-          :type="openTimeLimit ? 'primary' : 'default'"
-          class="toggle-btn"
-          :class="{ 'toggle-btn--active': openTimeLimit }"
-          @click="handleToggleLimit"
-        >
-          {{ openTimeLimit ? t('rateLimit.disableLimit') : t('rateLimit.enableLimit') }}
-        </el-button>
         <el-slider
           v-if="openTimeLimit"
           :model-value="timeLimit"
@@ -28,6 +20,14 @@
           class="custom-slider"
           @update:model-value="handleTimeLimitChange"
         />
+        <el-button
+          :type="openTimeLimit ? 'primary' : 'default'"
+          class="toggle-btn"
+          :class="{ 'toggle-btn--active': openTimeLimit }"
+          @click="handleToggleLimit"
+        >
+          {{ openTimeLimit ? t('rateLimit.disableLimit') : t('rateLimit.enableLimit') }}
+        </el-button>
       </div>
     </div>
 
@@ -101,12 +101,15 @@ const handleTimeoutChange = (value: number | undefined) => {
 }
 
 .toggle-btn {
-  min-width: 140px;
+  min-width: 107px;
   font-weight: 500;
   color: #5b7c99;
   border-color: #c5d3de;
   background: #ffffff;
   transition: all 0.25s ease;
+  display: block;      /* 让按钮独占一行 */
+  margin-left: auto;   /* 自己靠右 */
+  margin-top: 20px;    /* 和上面内容拉开距离，可选 */
 }
 
 .toggle-btn:hover {
