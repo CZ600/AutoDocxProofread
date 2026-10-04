@@ -203,6 +203,10 @@ html.dark .btn-subtle:hover {
    色值沿用原 Proof.vue 的 category-* 定义；彩色底白字明暗两主题通用。 */
 .category-badge {
   display: inline-block;
+  box-sizing: border-box;
+  /* 与 Proof 列表的 .correction-type 同款宽度对齐：各类型统一徽标宽度 */
+  min-width: 68px;
+  text-align: center;
   padding: 2px 10px;
   border-radius: 4px;
   font-size: 12px;
