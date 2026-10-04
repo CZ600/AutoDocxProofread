@@ -197,47 +197,71 @@ html.dark .btn-subtle:hover {
   border: none;
 }
 
-/* 批量应用下拉的类型徽标（DocPreview 模板）。
-   注意必须直接给底色：下拉项只有 category-* 没有 type-* 类，
-   引用 .type-* 上的自定义属性会解析失败变透明底 + 白字（浅色下不可辨）。
-   色值沿用原 Proof.vue 的 category-* 定义；彩色底白字明暗两主题通用。 */
+/* 批量应用下拉的类型标识（DocPreview 模板）：简约形式——无边框、无填充，
+   仅以文字颜色区分类型；保留统一宽度对齐。文字色取 .type-* 色板的
+   --type-badge-text 同族，与校对列表徽标观感一致。 */
 .category-badge {
   display: inline-block;
   box-sizing: border-box;
-  /* 与 Proof 列表的 .correction-type 同款宽度对齐；下拉空间紧凑，宽度取窄一档 */
   min-width: 56px;
   text-align: center;
   padding: 2px 10px;
   border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
 }
 
 .category-typo,
 .category-worderror {
-  background-color: #c28a8a;
+  color: #a87070;
 }
 
 .category-punctuation {
-  background-color: #c2a86a;
+  color: #a08850;
 }
 
 .category-grammar {
-  background-color: var(--brand);
+  color: #5b7c99;
 }
 
 .category-consistency {
-  background-color: #8a929e;
+  color: #6a7380;
 }
 
 .category-comprehensiveerror,
 .category-polish {
-  background-color: #8ab89e;
+  color: #5a9070;
 }
 
 .category-reduceai {
-  background-color: #9b6dc6;
+  color: #8a5ebf;
+}
+
+/* 暗色下拉面板（#1d1e1f）上提亮一档，保证可辨 */
+html.dark .category-typo,
+html.dark .category-worderror {
+  color: #d08888;
+}
+
+html.dark .category-punctuation {
+  color: #d0b070;
+}
+
+html.dark .category-grammar {
+  color: #8fb4d4;
+}
+
+html.dark .category-consistency {
+  color: #9aa4b1;
+}
+
+html.dark .category-comprehensiveerror,
+html.dark .category-polish {
+  color: #7fc79b;
+}
+
+html.dark .category-reduceai {
+  color: #b088d8;
 }
 
 /* ---- 预览高亮（原 Proof.vue 全局块收敛至此：DocPreview 与 Proof 共用，
