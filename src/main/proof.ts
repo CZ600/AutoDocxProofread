@@ -300,37 +300,44 @@ function getPromptSettingsFilePath() {
   return path.join(app.getPath('userData'), 'prompt-settings.json')
 }
 
-function ensurePromptSettingsLoaded() {
+let promptSettingsLoadPromise: Promise<void> | null = null
+
+/** 异步加载提示词设置（fs/promises，单飞防止并发重复读文件） */
+async function ensurePromptSettingsLoaded(): Promise<void> {
   if (promptSettingsLoaded) return
-
-  try {
-    const filePath = getPromptSettingsFilePath()
-    if (fs.existsSync(filePath)) {
-      const fileContent = fs.readFileSync(filePath, 'utf-8')
-      currentPromptSettings = normalizePromptSettings(JSON.parse(fileContent))
-    } else {
-      currentPromptSettings = clonePromptSettings(DEFAULT_PROMPT_SETTINGS)
-    }
-  } catch (error) {
-    console.error(getLocalizedConsoleMessages().loadPromptFailed, error)
-    currentPromptSettings = clonePromptSettings(DEFAULT_PROMPT_SETTINGS)
+  if (!promptSettingsLoadPromise) {
+    promptSettingsLoadPromise = (async () => {
+      try {
+        const filePath = getPromptSettingsFilePath()
+        const fileContent = await fs.promises.readFile(filePath, 'utf-8')
+        currentPromptSettings = normalizePromptSettings(JSON.parse(fileContent))
+      } catch (error: any) {
+        // 首次启动文件尚不存在属正常路径，静默回落默认；其余错误（解析失败等）留日志
+        if (!error || error.code !== 'ENOENT') {
+          console.error(getLocalizedConsoleMessages().loadPromptFailed, error)
+        }
+        currentPromptSettings = clonePromptSettings(DEFAULT_PROMPT_SETTINGS)
+      } finally {
+        promptSettingsLoaded = true
+        promptSettingsLoadPromise = null
+      }
+    })()
   }
-
-  promptSettingsLoaded = true
+  return promptSettingsLoadPromise
 }
 
-function persistPromptSettings() {
+async function persistPromptSettings(): Promise<void> {
   const filePath = getPromptSettingsFilePath()
-  fs.writeFileSync(filePath, JSON.stringify(currentPromptSettings, null, 2), 'utf-8')
+  await fs.promises.writeFile(filePath, JSON.stringify(currentPromptSettings, null, 2), 'utf-8')
 }
 
-function getCurrentPromptSettings(): PromptSettings {
-  ensurePromptSettingsLoaded()
+async function getCurrentPromptSettings(): Promise<PromptSettings> {
+  await ensurePromptSettingsLoaded()
   return clonePromptSettings(currentPromptSettings)
 }
 
-function getCurrentEffectivePrompt(): string {
-  ensurePromptSettingsLoaded()
+async function getCurrentEffectivePrompt(): Promise<string> {
+  await ensurePromptSettingsLoaded()
   return buildPromptFromSettings(currentPromptSettings, currentLocale)
 }
 
@@ -429,12 +436,12 @@ export async function getDefaultPrompt(): Promise<string> {
 
 export async function setNewPrompt(newPrompt: string): Promise<boolean> {
   const nextSettings = normalizePromptSettings({
-    ...getCurrentPromptSettings(),
+    ...(await getCurrentPromptSettings()),
     customPromptEnabled: true,
     customPrompt: newPrompt
   })
   currentPromptSettings = nextSettings
-  persistPromptSettings()
+  await persistPromptSettings()
   return true
 }
 
@@ -444,7 +451,7 @@ export async function getPromptSettings(): Promise<PromptSettings> {
 
 export async function setPromptSettings(settings: PromptSettings): Promise<boolean> {
   currentPromptSettings = normalizePromptSettings(settings)
-  persistPromptSettings()
+  await persistPromptSettings()
   return true
 }
 
@@ -454,7 +461,7 @@ export async function getEffectivePrompt(): Promise<string> {
 
 export async function resetPromptSettings(): Promise<boolean> {
   currentPromptSettings = clonePromptSettings(DEFAULT_PROMPT_SETTINGS)
-  persistPromptSettings()
+  await persistPromptSettings()
   return true
 }
 
@@ -1397,7 +1404,7 @@ export async function proofreadDocument(
   console.log('process mode is:', mode)
   console.log('process api is:', apiURL, modelName)
   const progressMessages = getLocalizedProgressMessages()
-  const effectivePrompt = getCurrentEffectivePrompt()
+  const effectivePrompt = await getCurrentEffectivePrompt()
   let total_tokens = 0 // calculate the usage of tokens
   // set the limit of request per minute
   const option = requestsPerMinute
@@ -2133,8 +2140,8 @@ export async function reviewCorrections(
   return { reviewedResult: filterInvalidCorrections(corrections), token_usage: totalTokens }
 }
 
-export function getCurrentBackgroundInstruction(): string {
-  ensurePromptSettingsLoaded()
+export async function getCurrentBackgroundInstruction(): Promise<string> {
+  await ensurePromptSettingsLoaded()
   return buildBackgroundInstruction(currentPromptSettings, currentLocale)
 }
 

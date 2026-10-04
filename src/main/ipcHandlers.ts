@@ -1,6 +1,7 @@
 import { ipcMain, session, BrowserWindow, type IpcMainInvokeEvent } from 'electron'
 import { dialog } from 'electron'
 import * as path from 'path'
+import fs from 'fs'
 import { DB } from './database'
 import { maskKey } from './apiKeyCrypto'
 import { testAPI, testAPIWithProvider, setRequestTimeoutMs, setThinkingMode, ChatThinkingMode } from './chat'
@@ -154,7 +155,6 @@ export const registerIpcHandlers = () => {
     return ret
   })
   const path = require('path')
-  const fs = require('fs')
   // 处理文件选择请求
   ipcMain.handle('select-docx-file', async () => {
     try {
@@ -420,7 +420,7 @@ export const registerIpcHandlers = () => {
               message: '正在审核校对结果'
             })
             try {
-              const backgroundInstruction = getCurrentBackgroundInstruction()
+              const backgroundInstruction = await getCurrentBackgroundInstruction()
               const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
                 proofResult,
                 backgroundInstruction,
@@ -502,7 +502,7 @@ export const registerIpcHandlers = () => {
               message: '正在审核校对结果'
             })
             try {
-              const backgroundInstruction = getCurrentBackgroundInstruction()
+              const backgroundInstruction = await getCurrentBackgroundInstruction()
               const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
                 proofResult,
                 backgroundInstruction,
@@ -584,7 +584,7 @@ export const registerIpcHandlers = () => {
               message: '正在审核校对结果'
             })
             try {
-              const backgroundInstruction = getCurrentBackgroundInstruction()
+              const backgroundInstruction = await getCurrentBackgroundInstruction()
               const { reviewedResult, token_usage: reviewTokens } = await reviewCorrections(
                 proofResult,
                 backgroundInstruction,
@@ -838,8 +838,8 @@ export const registerIpcHandlers = () => {
         return { success: false, canceled: true }
       }
 
-      const fs = require('fs')
-      fs.copyFileSync(clonedFilePath, saveResult.filePath)
+      // 同步 copyFileSync 会阻塞主进程，大文件导出期间卡住所有 IPC；改异步
+      await fs.promises.copyFile(clonedFilePath, saveResult.filePath)
       return { success: true, canceled: false, filePath: saveResult.filePath }
     } catch (error) {
       console.error('导出格式克隆文档失败:', error)
@@ -1131,7 +1131,7 @@ export const registerIpcHandlers = () => {
 
   // 获取当前校对背景信息
   ipcMain.handle('getCurrentBackgroundInstruction', async () => {
-    return getCurrentBackgroundInstruction()
+    return await getCurrentBackgroundInstruction()
   })
 
   // 从格式描述生成格式参数（调用大模型）
