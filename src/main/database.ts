@@ -224,19 +224,6 @@ export class DB {
     return result.changes > 0 // 如果有行被删除，返回 true，否则返回 false
   }
 
-  // 删除所有数据集
-  static async deleteALLSettings(): Promise<boolean> {
-    const db = await DB.getInstance()
-    await db.run(`DELETE FROM api_settings`)
-    const result = await db.run(`SELECT * FROM api_settings`)
-    const count = await DB.getAPISettingsCount()
-    if (result.changes === count) {
-      return true
-    } else {
-      return false
-    }
-  }
-
   static async deleteALLHistory(): Promise<boolean> {
     const db = await DB.getInstance()
     await db.run(`DELETE FROM proof_history`)
