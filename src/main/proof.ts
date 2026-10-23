@@ -23,6 +23,42 @@ import * as zhCNPrompts from '../shared/prompts/zh-CN'
 import * as enPrompts from '../shared/prompts/en'
 
 // ====== 类型定义 ======
+
+// ====== 宿主环境注入点（Electron 主进程与 dsh 插件宿主共用本引擎）======
+// 以下默认实现即 Electron 行为；非 Electron 宿主（dsh 插件）在调用校对入口前
+// 注入替代实现。注入点只覆盖环境依赖（目录解析、模型通道），不改变校对流程本身。
+
+/** 数据目录解析：prompt-settings.json 的存放根目录。 */
+let resolveDataDir: () => string = () => app.getPath('userData')
+
+/** 覆盖数据目录解析（dsh 插件等非 Electron 宿主用）。 */
+export function setProofreadDataDir(resolver: () => string): void {
+  resolveDataDir = resolver
+}
+
+/** 模型调用器的统一签名：与 callModelAPI 一致，供宿主替换底层通道（如 ctx.llm）。 */
+export type ProofreadModelCaller = (
+  systemPrompt: string,
+  userPrompt: string,
+  apiKey: string,
+  modelName: string,
+  apiURL: string,
+  provider?: ModelProvider,
+  onChunk?: OnChunk,
+  signal?: AbortSignal,
+  onThinking?: OnChunk
+) => Promise<{ result: string; total_tokens: number }>
+
+let modelCaller: ProofreadModelCaller | null = null
+
+/**
+ * 覆盖模型调用通道。未覆盖时走 chat.ts 默认实现（Electron 应用行为不变）；
+ * dsh 插件用它把所有 LLM 调用切到宿主的 ctx.llm.stream()。
+ */
+export function setProofreadModelCaller(caller: ProofreadModelCaller): void {
+  modelCaller = caller
+}
+
 interface ProofreadingCorrection {
   original: string
   suggested: string
@@ -103,6 +139,11 @@ async function callModelAPI(
   signal?: AbortSignal,
   onThinking?: OnChunk
 ): Promise<{ result: string; total_tokens: number }> {
+  // 宿主注入的模型通道优先（dsh 插件走 ctx.llm）；未注入时保持 chat.ts 默认行为
+  if (modelCaller) {
+    return modelCaller(systemPrompt, userPrompt, apiKey, modelName, apiURL, provider, onChunk, signal, onThinking)
+  }
+
   const actualProvider = provider || ModelProvider.OPENAI_COMPATIBLE
 
   console.log(
@@ -298,7 +339,7 @@ let currentPromptSettings: PromptSettings = clonePromptSettings(DEFAULT_PROMPT_S
 let promptSettingsLoaded = false
 
 function getPromptSettingsFilePath() {
-  return path.join(app.getPath('userData'), 'prompt-settings.json')
+  return path.join(resolveDataDir(), 'prompt-settings.json')
 }
 
 let promptSettingsLoadPromise: Promise<void> | null = null
@@ -1008,8 +1049,10 @@ async function summarizeDocumentTheme(
     // 取消不属于"主题总结失败"：向上传播，让整个校对流程终止
     if (cancelToken?.cancelled) throw new ProofreadCancelledError()
     console.error(getLocalizedConsoleMessages().summarizeThemeError, error)
+    // 主题总结失败不注入占位文本：空串会让 buildDocumentContextInjection 省略主题行，
+    // 避免把 'error' 这类字面量当作文档主题拼进 system prompt
     return {
-      result: 'error',
+      result: '',
       total_tokens: null
     }
   }
@@ -1065,7 +1108,8 @@ function extractCorrectionsFromText(text: string, ragChunks?: string[]): Proofre
 
     if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
       const jsonString = cleanedText.substring(firstBracket, lastBracket + 1)
-      console.log('提取到的JSON字符串:', jsonString)
+      // LLM 原始输出即用户文档内容，不落日志，只记长度摘要
+      writeLog(`[proofread] extracted JSON candidate: chars=${jsonString.length}`)
 
       const parsed = JSON.parse(jsonString)
       if (Array.isArray(parsed)) {
@@ -1267,15 +1311,12 @@ const queryDocChunk = async (
       return true
     })
   }
-  console.info('-----------------------------------RAG Query----------------------------')
-  console.info('the unique results of query:', uniqueChunks)
-  console.log('the proofreading content:', content)
-
   const topChunks = uniqueChunks
     .filter(item => typeof item.score === 'number' && typeof item.text === 'string')
     .sort((a, b) => b.score - a.score)
     .slice(0, effectiveSelectNum)
-  console.info('the top relative result of query:', topChunks)
+  // chunk 全文与校对正文不落日志（用户文档/知识库内容），只记条数摘要
+  writeLog(`[rag] queryDocChunk: unique=${uniqueChunks.length}, selected=${topChunks.length}, contentChars=${content.length}`)
 
   return topChunks.map(item => item.text)
 }
@@ -1466,8 +1507,8 @@ async function proofreadDocumentImpl(
   // set the limit of request per minute
   const option = requestsPerMinute
     ? {
-        requestsPerMinute
-      }
+      requestsPerMinute
+    }
     : undefined
   // 失败分片收集：默认空数组（full 模式单请求失败直接向上抛错，走整体失败提示）
   const failedSegments: FailedSegment[] = []
@@ -2165,12 +2206,8 @@ export async function reviewCorrections(
 
       const batchFiltered = batch.filter(c => c.filtered || isNoErrorReason(c.reason))
       if (batchFiltered.length > 0) {
+        // 建议原文即用户文档内容，只记条数不落正文
         console.log(`[审核] 第${batchIdx + 1}批: 过滤 ${batchFiltered.length}/${batch.length} 条建议`)
-        batchFiltered.forEach(c => {
-          console.log(
-            `  - 过滤: "${c.original}" → "${c.suggested}" | 原因: ${c.filterReason || filterReasons.noReason}`
-          )
-        })
       } else {
         console.log(`[审核] 第${batchIdx + 1}批: 保留全部 ${batch.length} 条建议`)
       }
@@ -2228,10 +2265,8 @@ export async function reviewCorrections(
 
   const filtered = corrections.filter(c => c.filtered || isNoErrorReason(c.reason))
   if (filtered.length > 0) {
+    // 建议原文即用户文档内容，只记条数不落正文
     console.log(`[审核] 过滤 ${filtered.length}/${corrections.length} 条建议`)
-    filtered.forEach(c => {
-      console.log(`  - 过滤: "${c.original}" → "${c.suggested}" | 原因: ${c.filterReason || filterReasons.noReason}`)
-    })
   } else {
     console.log(`[审核] 保留全部 ${corrections.length} 条建议`)
   }

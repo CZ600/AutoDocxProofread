@@ -136,7 +136,9 @@ export function buildThemeUserPrompt(title: string, sections: { title: string }[
 }
 
 export function buildDocumentContextInjection(title: string, theme: string, sectionTitle: string): string {
-  return `文档标题: ${title}\n文档主题: ${theme}\n当前章节标题: ${sectionTitle}`
+  // 主题总结失败时 theme 为空串：省略主题行而不是注入空值
+  const themeLine = theme ? `文档主题: ${theme}\n` : ''
+  return `文档标题: ${title}\n${themeLine}当前章节标题: ${sectionTitle}`
 }
 
 export const USER_PROMPT_TEXT = '需要校对的内容'

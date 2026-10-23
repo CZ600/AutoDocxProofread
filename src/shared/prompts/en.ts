@@ -141,7 +141,9 @@ export function buildThemeUserPrompt(title: string, sections: { title: string }[
 }
 
 export function buildDocumentContextInjection(title: string, theme: string, sectionTitle: string): string {
-  return `Document title: ${title}\nDocument theme: ${theme}\nCurrent section title: ${sectionTitle}`
+  // Omit the theme line when theme summarization failed (empty string)
+  const themeLine = theme ? `Document theme: ${theme}\n` : ''
+  return `Document title: ${title}\n${themeLine}Current section title: ${sectionTitle}`
 }
 
 export const USER_PROMPT_TEXT = 'Content to proofread'

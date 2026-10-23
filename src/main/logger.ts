@@ -2,11 +2,20 @@ import fs from 'fs'
 import path from 'path'
 import { app } from 'electron'
 
-// 日志目录与文件：userData 在 electron-builder / forge 下都稳定可写，不受 asar 结构影响
-const logDir = path.join(app.getPath('userData'), 'logs')
-const logFile = path.join(logDir, 'main.log')
+// 日志目录与文件：userData 在 electron-builder / forge 下都稳定可写，不受 asar 结构影响。
+// 非 Electron 宿主（dsh 插件）通过 setLogDirResolver 注入自己的日志目录。
+let resolveLogDir: () => string = () => path.join(app.getPath('userData'), 'logs')
+
+/** 覆盖日志目录解析（dsh 插件等非 Electron 宿主用）。 */
+export function setLogDirResolver(resolver: () => string): void {
+  resolveLogDir = resolver
+}
+
+function getLogFile(): string {
+  return path.join(resolveLogDir(), 'main.log')
+}
+
 // 轮转：超过 2MB 改名为 main.log.1（覆盖上一份旧日志），当前文件重新开始写
-const ROTATED_FILE = `${logFile}.1`
 const MAX_LOG_BYTES = 2 * 1024 * 1024
 
 type LogLevel = 'info' | 'warn' | 'error'
@@ -18,11 +27,13 @@ let writeQueue: Promise<void> = Promise.resolve()
 function enqueueWrite(line: string): void {
   writeQueue = writeQueue
     .then(async () => {
+      const logDir = resolveLogDir()
+      const logFile = getLogFile()
       await fs.promises.mkdir(logDir, { recursive: true })
-      const stat = await fs.promises.stat(logFile).catch(() => null)
+      const stat = await fs.promises.stat(logFile).catch((_err: unknown): null => null)
       if (stat && stat.size >= MAX_LOG_BYTES) {
-        await fs.promises.rm(ROTATED_FILE, { force: true })
-        await fs.promises.rename(logFile, ROTATED_FILE)
+        await fs.promises.rm(`${logFile}.1`, { force: true })
+        await fs.promises.rename(logFile, `${logFile}.1`)
       }
       await fs.promises.appendFile(logFile, line, 'utf8')
     })
@@ -57,4 +68,4 @@ if (process.env.NODE_ENV === 'development') {
   Object.assign(global, { writeLog })
 }
 
-export { writeLog, logFile }
+export { writeLog, getLogFile }

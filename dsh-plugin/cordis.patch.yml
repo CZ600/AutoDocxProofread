@@ -1,0 +1,6 @@
+# dsh-docx-proofread bundle patch layer.
+# Applied to any profile that lists this bundle; the row references the
+# installed package by name so the dsh loader resolves dist/index.js.
+- insert:
+    - id: docx-proofread
+      name: dsh-docx-proofread
