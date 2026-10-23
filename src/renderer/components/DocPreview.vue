@@ -153,6 +153,7 @@ import {
   ElIcon
 } from 'element-plus'
 import { renderAsync } from 'docx-preview'
+import { DOCX_RENDER_OPTIONS } from '../utils/previewRender'
 import { fileInfoStore } from '../stores/store'
 import { useEmbeddingStore } from '../stores/embeddingStore'
 import { useApiStore } from '../stores/apiStore'
@@ -262,7 +263,7 @@ const renderDocx = async file => {
   try {
     if (previewContainer.value) {
       previewContainer.value.innerHTML = ''
-      await renderAsync(file, previewContainer.value)
+      await renderAsync(file, previewContainer.value, null, DOCX_RENDER_OPTIONS)
       // 大文档性能：视口外的页面跳过布局/绘制，滚动到时再实时渲染
       applyPreviewPerfHints(previewContainer.value)
     } else {

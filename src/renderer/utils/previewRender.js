@@ -10,6 +10,13 @@ import { applyPreviewPerfHints } from './previewPerf'
 export const DOCX_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
+/**
+ * 回放 Word 保存时写入的 lastRenderedPageBreak 标记实现分页（与
+ * better-sidebar office 插件一致）；docx-preview 默认忽略该标记导致长文
+ * 渲染成一整页。生成器（python-docx 等）产出的文档没有标记，退化为长页。
+ */
+export const DOCX_RENDER_OPTIONS = { ignoreLastRenderedPageBreak: false }
+
 /** IPC 读回的字节缓冲 → 可供 renderAsync 的 File 对象 */
 export const createDocxFile = (buffer, name) => {
   const blob = new Blob([buffer], { type: DOCX_MIME })
@@ -22,7 +29,7 @@ export const renderDocxFileToContainer = async (filePath, fileName, container) =
   const file = createDocxFile(fileData.buffer, fileName)
   if (!container) return
   container.innerHTML = ''
-  await renderAsync(file, container)
+  await renderAsync(file, container, null, DOCX_RENDER_OPTIONS)
   // 大文档性能：视口外的页面跳过布局/绘制，滚动到时再实时渲染
   applyPreviewPerfHints(container)
 }
